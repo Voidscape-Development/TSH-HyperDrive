@@ -46,22 +46,6 @@ query SetQuery($id: ID!) {
 						id
 						gamerTag
 						prefix
-						sets(page: 1, perPage: 1) {
-							nodes {
-								games {
-									selections {
-										entrant {
-											participants {
-												player {
-													id
-												}
-											}
-										}
-										selectionValue
-									}
-								}
-							}
-						}
 					}
 				}
 			}

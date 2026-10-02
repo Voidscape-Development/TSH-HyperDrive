@@ -2,6 +2,8 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.cookiejar import DefaultCookiePolicy
 import re
+import threading
+import time
 import requests
 import requests.adapters
 import os
@@ -95,9 +97,14 @@ class StartGGDataProvider(TournamentDataProvider):
                 requestCode = data.status_code
                 retries += 1
             data = orjson.loads(data.text)
+            # GraphQL errors (e.g. the complexity cap) come back as a 200,
+            # so they'd otherwise look like an empty result
+            if isinstance(data, dict) and data.get("errors"):
+                logger.warning(f"start.gg {(jsonParams or {}).get('operationName', url)} returned errors: {data.get('errors')}")
             return data
         except Exception as e:
-            logger.error(f"{type(e).__name__}: {e}")
+            # `type` is the request-method parameter here, not the builtin
+            logger.error(f"{e.__class__.__name__}: {e}")
             return {}
 
     def GetTournamentData(self, progress_callback=None, cancel_event=None):
@@ -777,32 +784,6 @@ class StartGGDataProvider(TournamentDataProvider):
                         playerData["gamerTag"] = player.get("gamerTag")
                         playerData["name"] = player.get("name")
 
-                        # Main character
-                        playerSelections = Counter()
-
-                        sets = deep_get(player, "sets.nodes", [])
-                        playerId = player.get("id")
-                        if len(sets) > 0:
-                            games = sets[0].get("games", [])
-                            if games and len(games) > 0:
-                                for game in games:
-                                    selections = game.get("selections", [])
-                                    if selections:
-                                        for selection in selections:
-                                            participants = selection.get(
-                                                "entrant", {}).get("participants", [])
-                                            if len(participants) > 0:
-                                                participantId = participants[0].get(
-                                                    "player", {}).get("id", None)
-                                                if participantId and participantId == playerId:
-                                                    playerSelections[selection.get(
-                                                        "selectionValue")] += 1
-
-                        main = playerSelections.most_common(1)
-
-                        if len(main) > 0:
-                            playerData["startggMain"] = main[0][0]
-
                     if user:
                         if user.get("authorizations"):
                             if len(user.get("authorizations", [])) > 0:
@@ -846,12 +827,6 @@ class StartGGDataProvider(TournamentDataProvider):
                                 if stateCode:
                                     playerData["state_code"] = stateCode
                             if user.get("location").get("city"): playerData["city"] = user.get("location").get("city")
-
-                        if playerData.get("startggMain"):
-                            main = TSHGameAssetManager.instance.GetCharacterFromStartGGId(
-                                playerData.get("startggMain"))
-                            if main:
-                                playerData["mains"] = main[0]
 
                     if "id" not in playerData:
                         playerData["id"] = [
@@ -1904,7 +1879,7 @@ class StartGGDataProvider(TournamentDataProvider):
             logger.error(traceback.format_exc())
             return []
 
-    def _FetchEntrantsPage(self, eventSlug, gameId, page):
+    def _FetchEntrantsPage(self, eventSlug, page):
         return self.QueryRequests(
             "https://www.start.gg/api/-/gql",
             type=requests.post,
@@ -1912,7 +1887,6 @@ class StartGGDataProvider(TournamentDataProvider):
                 "operationName": "EventEntrantsListQuery",
                 "variables": {
                     "eventSlug": eventSlug,
-                    "videogameId": gameId,
                     "page": page,
                 },
                 "query": StartGGDataProvider.EntrantsQuery
@@ -1922,7 +1896,7 @@ class StartGGDataProvider(TournamentDataProvider):
     def GetEntrantsWorker(self, eventSlug, gameId, progress_callback, cancel_event):
         try:
             logger.info("Starting Entrant Import")
-            firstPage = self._FetchEntrantsPage(eventSlug, gameId, 1)
+            firstPage = self._FetchEntrantsPage(eventSlug, 1)
             totalPages = deep_get(
                 firstPage, "data.event.entrants.pageInfo.totalPages", 0)
             logger.info(f"Entrant pages: {totalPages}")
@@ -1934,7 +1908,7 @@ class StartGGDataProvider(TournamentDataProvider):
                 # Keep the worker count low so start.gg doesn't start rate limiting us
                 with ThreadPoolExecutor(max_workers=6) as executor:
                     pages.extend(executor.map(
-                        lambda p: self._FetchEntrantsPage(eventSlug, gameId, p),
+                        lambda p: self._FetchEntrantsPage(eventSlug, p),
                         range(2, totalPages + 1)
                     ))
 
@@ -1954,7 +1928,72 @@ class StartGGDataProvider(TournamentDataProvider):
 
             logger.info(f"Entrants processed: {len(players)}")
             TSHPlayerDB.AddPlayers(players)
+
+            # The entrants query no longer carries each player's last set
+            # (that sub-selection blew StartGG's complexity cap and forced
+            # tiny pages), so fill mains in the background instead of making
+            # the scoreboard fetch them one by one while it holds its locks.
+            threading.Thread(
+                target=self._PrewarmMains, args=(players, gameId),
+                name="StartGGMainsPrewarm", daemon=True
+            ).start()
         except Exception as e:
+            logger.error(traceback.format_exc())
+
+    # Spacing between pre-warm requests, keeping well under start.gg's
+    # 80 requests/minute so interactive queries still have room.
+    _prewarm_interval_secs = 1.5
+
+    def _PrewarmMains(self, players, videogameId):
+        try:
+            selected = TSHGameAssetManager.instance.selectedGame or {}
+            gameCodename = selected.get("codename")
+            if not videogameId or not gameCodename:
+                return
+
+            todo = []
+            for player in players:
+                slug = player.get("startgg_user_slug")
+                if not slug or (slug, videogameId) in self._mains_cache:
+                    continue
+                tag = player.get("prefix")+" "+player.get("gamerTag") \
+                    if player.get("prefix") else player.get("gamerTag")
+                dbMains = (TSHPlayerDB.database.get(tag) or {}).get("mains") or {}
+                if isinstance(dbMains, str):
+                    dbMains = orjson.loads(dbMains)
+                if dbMains.get(gameCodename):
+                    continue
+                todo.append((slug, player))
+
+            logger.info(f"Pre-warming start.gg mains for {len(todo)} players")
+
+            found = []
+            for slug, player in todo:
+                # Stop if the user switched tournament or game meanwhile
+                if getattr(self.tshTdp, "provider", self) is not self:
+                    break
+                if (TSHGameAssetManager.instance.selectedGame or {}).get("smashgg_game_id") != videogameId:
+                    break
+
+                mains = self._FetchUserMains(slug, videogameId)
+                if mains is not None:
+                    self._mains_cache[(slug, videogameId)] = mains
+                if mains:
+                    found.append({
+                        "prefix": player.get("prefix"),
+                        "gamerTag": player.get("gamerTag"),
+                        "mains": {g: [list(m) for m in ms] for g, ms in mains.items()},
+                    })
+                # Save in batches so progress survives a closed app
+                if len(found) >= 25:
+                    TSHPlayerDB.AddPlayers(found)
+                    found = []
+                time.sleep(self._prewarm_interval_secs)
+
+            if found:
+                TSHPlayerDB.AddPlayers(found)
+            logger.info("start.gg mains pre-warm finished")
+        except Exception:
             logger.error(traceback.format_exc())
 
     def ProcessEntrantData(entrant, setData=[]):
@@ -2089,9 +2128,14 @@ class StartGGDataProvider(TournamentDataProvider):
         videogameId = selected.get("smashgg_game_id")
         if not videogameId:
             return playerData
-        if slug not in self._mains_cache:
-            self._mains_cache[slug] = self.GetUserMains(slug, videogameId)
-        mains = self._mains_cache[slug]
+        key = (slug, videogameId)
+        if key in self._mains_cache:
+            mains = self._mains_cache[key]
+        else:
+            mains = self._FetchUserMains(slug, videogameId)
+            # A failed lookup isn't cached, so it gets retried next load
+            if mains is not None:
+                self._mains_cache[key] = mains
         if mains:
             playerData["mains"] = mains
         return playerData
@@ -2105,6 +2149,11 @@ class StartGGDataProvider(TournamentDataProvider):
         # locally (the mapping is normally inside ProcessEntrantData's
         # `if user:` branch, which doesn't apply to a user-only synthesis).
         # Returns ({gameCodename: [[char_name], ...]}) or {}.
+        return self._FetchUserMains(slug, videogameId) or {}
+
+    def _FetchUserMains(self, slug, videogameId):
+        # Same as GetUserMains, but returns None when the request itself
+        # failed so callers can tell "no mains" apart from "try again".
         if not slug or not videogameId:
             return {}
         data = self.QueryRequests(
@@ -2116,6 +2165,8 @@ class StartGGDataProvider(TournamentDataProvider):
                 "query": StartGGDataProvider.UserMainsQuery,
             },
         )
+        if not data or data.get("errors") or not data.get("data"):
+            return None
         player = deep_get(data, "data.user.player")
         if not player:
             return {}
