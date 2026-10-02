@@ -634,6 +634,15 @@ class WebServer(QThread):
     def ws_update_bracket(message):
         WebServer.ws_emit('update_bracket', WebServer.actions.update_bracket())
 
+    # Update only the set results of the loaded bracket, keeping its players
+    @app.route('/update-bracket-sets')
+    def update_bracket_sets():
+        return WebServer.actions.update_bracket_sets()
+
+    @socketio.on('update_bracket_sets')
+    def ws_update_bracket_sets(message):
+        WebServer.ws_emit('update_bracket_sets', WebServer.actions.update_bracket_sets())
+
     # Load player from tag
     @app.route('/scoreboard<scoreboardNumber>-load-player-from-tag-<team>-<player>')
     def load_player_from_tag(scoreboardNumber, team, player):

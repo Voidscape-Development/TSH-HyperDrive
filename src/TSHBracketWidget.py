@@ -161,7 +161,7 @@ class TSHBracketWidget(QDockWidget):
             "app", "Update only the set results of the loaded bracket, without reloading its players"))
         self.btRefreshSets.setSizePolicy(
             QSizePolicy.Maximum, QSizePolicy.Fixed)
-        self.btRefreshSets.clicked.connect(self.RefreshSets)
+        self.btRefreshSets.clicked.connect(lambda: self.RefreshSets())
         phaseGroupLayout: QHBoxLayout = self.findChild(
             QHBoxLayout, "horizontalLayout_2")
         phaseGroupLayout.addWidget(self.btRefreshSets)
@@ -328,15 +328,20 @@ class TSHBracketWidget(QDockWidget):
                 self.phaseGroupSelection.currentData().get("id"))
 
     def RefreshSets(self):
+        # Returns what it did, for the web server's update-bracket-sets
         selected = self.phaseGroupSelection.currentData()
         if selected is None or selected.get("id") is None:
-            return
+            return "NO_PHASE_GROUP"
 
         # Nothing of this phase group loaded yet, so there's nothing to
         # update: load all of it
         if self.loadedPhaseGroupId is None or str(self.loadedPhaseGroupId) != str(selected.get("id")):
             self.PhaseGroupChanged()
-            return
+            return "RELOADING_PHASE_GROUP"
+
+        # Already fetching them
+        if not self.btRefreshSets.isEnabled():
+            return "ALREADY_UPDATING"
 
         self.btRefreshSets.setEnabled(False)
         TSHTournamentDataProvider.instance.GetTournamentPhaseGroupSets(
@@ -344,6 +349,7 @@ class TSHBracketWidget(QDockWidget):
             graph=self.bracket.isGraph,
             onFinished=lambda: self.btRefreshSets.setEnabled(True)
         )
+        return "OK"
 
     def ApplySetsUpdate(self, update):
         # A different phase group was loaded meanwhile, or one is being loaded
