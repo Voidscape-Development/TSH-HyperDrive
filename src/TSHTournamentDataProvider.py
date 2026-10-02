@@ -25,6 +25,7 @@ class TSHTournamentDataProviderSignals(QObject):
     get_stations_finished = Signal(list)
     tournament_phases_updated = Signal(list)
     tournament_phasegroup_updated = Signal(dict)
+    tournament_phasegroup_sets_updated = Signal(dict)
     game_changed = Signal(int)
     stream_queue_loaded = Signal(dict)
     sets_data_updated = Signal(dict)
@@ -279,9 +280,24 @@ class TSHTournamentDataProvider(QObject):
     def GetTournamentPhaseGroup(self, id):
         worker = Worker(self.provider.GetTournamentPhaseGroup, **{"id": id})
         worker.signals.result.connect(lambda phaseGroupData: [
+            # Which phase group this is, so its sets can be refreshed later
+            phaseGroupData.update({"phaseGroupId": id}) if phaseGroupData else None,
             TSHTournamentDataProvider.instance.signals.tournament_phasegroup_updated.emit(
                 phaseGroupData)
         ])
+        self.threadPool.start(worker)
+
+    def GetTournamentPhaseGroupSets(self, id, graph=False, onFinished=None):
+        worker = Worker(self.provider.GetTournamentPhaseGroupSets,
+                        **{"id": id, "graph": graph})
+        worker.signals.result.connect(lambda setsData: [
+            TSHTournamentDataProvider.instance.signals.tournament_phasegroup_sets_updated.emit({
+                "phaseGroupId": id,
+                "data": setsData or {}
+            })
+        ])
+        if onFinished:
+            worker.signals.finished.connect(onFinished)
         self.threadPool.start(worker)
 
     def LoadSets(self, showFinished):

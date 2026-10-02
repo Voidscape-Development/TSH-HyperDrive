@@ -23,6 +23,8 @@ class BracketSet():
         self.fixedIds = [None, None]
         # Winner reported by the provider, for sets without a decisive score
         self.winnerSlot = None
+        # The provider's id for this set, so its result can be refreshed
+        self.id = None
 
 # Bracket always has a power of 2 number of players
 # if there are less than that, we round up and add
@@ -335,6 +337,7 @@ class Bracket():
             for j, id in enumerate(order[k]):
                 s = sets[id]
                 _set = BracketSet(bracket, [k, j])
+                _set.id = id
                 score = list(s.get("score") or [None, None])[:2]
                 score += [None] * (2 - len(score))
                 _set.score = [v if v is not None else 0 for v in score]

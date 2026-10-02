@@ -528,6 +528,15 @@ class WebServerActions(QThread):
         return "OK"
 
     @gui_thread_sync
+    def update_bracket_sets(self):
+        # Only the set results of the bracket loaded in the bracket widget,
+        # without reloading its players. The sets are fetched in the
+        # background, so this returns once the update has started.
+        if TSHBracketWidget.instance is None:
+            return "NO_BRACKET"
+        return TSHBracketWidget.instance.RefreshSets()
+
+    @gui_thread_sync
     def load_set(self, scoreboard, set=None, no_mains=False):
         if no_mains is False:
             no_mains = SettingsManager.Get("general.force_no_mains_on_new_set_loads", False)
