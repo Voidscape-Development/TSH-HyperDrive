@@ -57,7 +57,7 @@ class TSHCountryHelper(QObject):
                 return
 
         def validate(filename):
-            with open(filename, mode='r', encoding='utf-8') as f:
+            with open(filename, mode='rb') as f:
                 orjson.loads(f.read())
                 return True
 
@@ -101,9 +101,10 @@ class TSHCountryHelper(QObject):
 
     def LoadCountries():
         try:
-            f = open("./assets/countries+states+cities.json",
-                     'r', encoding='utf-8')
-            countries_json = orjson.loads(f.read())
+            # Read as bytes: decoding this ~47MB file to str first made
+            # loading it about 10 times slower
+            with open("./assets/countries+states+cities.json", 'rb') as f:
+                countries_json = orjson.loads(f.read())
             TSHCountryHelper.countries_json = countries_json
 
             # Setup countries - states

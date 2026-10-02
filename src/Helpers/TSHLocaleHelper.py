@@ -33,6 +33,8 @@ class TSHLocaleHelper(QObject):
     remapping = {}
     countryToLanguage = {}
     countryToContinent = {}
+    # Creating a Cutlet loads the whole MeCab dictionary, so it's done once
+    cutletInstance = None
 
     def LoadLocale():
         settingsProgramLocale = SettingsManager.Get("program_language", None)
@@ -117,8 +119,9 @@ class TSHLocaleHelper(QObject):
         if romanized_text:
             languages = TSHLocaleHelper.GetCountrySpokenLanguages(countryCode2)
             if "ja" in languages:
-                katsu = cutlet.Cutlet()
-                romanized_text = katsu.romaji(text)
+                if TSHLocaleHelper.cutletInstance is None:
+                    TSHLocaleHelper.cutletInstance = cutlet.Cutlet()
+                romanized_text = TSHLocaleHelper.cutletInstance.romaji(text)
             elif "zh" in languages:
                 pinyin_text = pinyin(text)
                 romanized_text = ""

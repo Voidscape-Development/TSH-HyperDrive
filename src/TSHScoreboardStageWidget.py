@@ -1,3 +1,4 @@
+import time
 import traceback
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
@@ -519,33 +520,43 @@ class TSHScoreboardStageWidget(QDockWidget):
         return ruleset
 
     def QueryRequests(self, url=None, type=None, headers=None, jsonParams=None, params=None):
-        requestCode = 0
-        data = None
-        while requestCode != 200:
+        # Retrying forever without a pause hammered start.gg and kept this
+        # thread spinning for the whole session when it was down or rate
+        # limiting, so give up after a few spaced out attempts.
+        for attempt in range(5):
+            if attempt > 0:
+                time.sleep(2 ** attempt)
             data = type(
                 url,
                 headers=headers,
                 json=jsonParams,
-                params=params
+                params=params,
+                timeout=20
             )
-            requestCode = data.status_code
-        return orjson.loads(data.text)
+            if data.status_code == 200:
+                return orjson.loads(data.text)
+        raise Exception(f"{url} returned status {data.status_code}")
 
     def LoadStartggRulesets(self):
         try:
             class DownloadThread(QThread):
                 query = self.QueryRequests
                 def run(self):
+                    # An exception escaping run() aborts the whole program
+                    try:
                         data = self.query(
                             "https://www.start.gg/api/-/gg_api./rulesets",
                             type=requests.get
                         )
-                        rulesets = deep_get(data, "entities.ruleset")
-                        open('./assets/rulesets.json',
-                             'wb').write(orjson.dumps(rulesets, option=orjson.OPT_INDENT_2))
-                        self.parent().startggRulesets = rulesets
-                        logger.info("startgg Rulesets downloaded from startgg")
-                        self.parent().signals.rulesets_changed.emit()
+                    except Exception:
+                        logger.error("Could not download startgg rulesets: " + traceback.format_exc())
+                        return
+                    rulesets = deep_get(data, "entities.ruleset")
+                    open('./assets/rulesets.json',
+                         'wb').write(orjson.dumps(rulesets, option=orjson.OPT_INDENT_2))
+                    self.parent().startggRulesets = rulesets
+                    logger.info("startgg Rulesets downloaded from startgg")
+                    self.parent().signals.rulesets_changed.emit()
             downloadThread = DownloadThread(self)
             downloadThread.start()
         except Exception as e:

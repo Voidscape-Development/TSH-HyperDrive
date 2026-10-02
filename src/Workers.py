@@ -3,7 +3,6 @@ from qtpy.QtGui import *
 from qtpy.QtWidgets import *
 from qtpy.QtCore import *
 
-from datetime import datetime
 import time
 import traceback
 import sys
@@ -108,6 +107,8 @@ class Worker(QRunnable):
 
         self.completed = False
         self.result = None
+        # Set once run() is done, so wait_for_all() doesn't have to poll
+        self.done_event = threading.Event()
 
     @Slot()
     def run(self):
@@ -131,6 +132,7 @@ class Worker(QRunnable):
 
             # self.completed is guaranteed to not cause a race condition self.result if checked first.
             self.completed = True
+            self.done_event.set()
 
     def cancel(self):
         '''
@@ -146,19 +148,11 @@ class Worker(QRunnable):
         :returns: True if the workers complete, false if a timeout is set and exceeded.
         """
 
-        start_time = datetime.now()
+        deadline = None if timeout is None else time.monotonic() + timeout
 
-        def is_timed_out():
-            nonlocal start_time
-            if timeout is None:
+        for w in workers:
+            remaining = None if deadline is None else max(0, deadline - time.monotonic())
+            if not w.done_event.wait(remaining):
                 return False
-            else:
-                return (datetime.now() - start_time).total_seconds() > timeout
 
-        while not is_timed_out():
-            if all(w.completed for w in workers):
-                return True
-
-            time.sleep(0.1)
-
-        return False
+        return True

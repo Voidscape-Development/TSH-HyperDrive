@@ -65,6 +65,10 @@ class StateManager:
     savePending = False
     saveScheduler: "StateManagerSaveScheduler | None" = None
 
+    # DeepDiff's threshold_to_diff_deeper: a dict with fewer than this share of
+    # its compared keys on both sides is reported as one values_changed.
+    DIFF_DEEPER_THRESHOLD = 0.33
+
     # Timestamp of the last 0 -> 1 transition of saveBlocked, used by the
     # watchdog to detect a BlockSaving() that never got its ReleaseSaving().
     saveBlockedSince = None
@@ -245,13 +249,20 @@ class StateManager:
         StateManager.changedPaths = []
 
         try:
-            diff = DeepDiff(
-                StateManager.lastSavedState,
-                StateManager.state,
-                exclude_types=[type(None)],
-                include_paths=changedKeys,
-                verbose_level=2, # Necessary to see values of added items.
-            )
+            # DeepDiff is slow, and without include_paths it compares the
+            # whole state, so only hand it the paths that really differ.
+            diffKeys = StateManager.NarrowChangedKeys(changedPaths)
+            if diffKeys is None or len(diffKeys) > 0:
+                diff = DeepDiff(
+                    StateManager.lastSavedState,
+                    StateManager.state,
+                    exclude_types=[type(None)],
+                    include_paths=diffKeys,
+                    verbose_level=2, # Necessary to see values of added items.
+                    threshold_to_diff_deeper=StateManager.DIFF_DEEPER_THRESHOLD,
+                )
+            else:
+                diff = {}
         except Exception as e:
             logger.error(traceback.format_exc())
             diff = None
@@ -286,6 +297,156 @@ class StateManager:
             ExportAll(
                 diff if diff is not None else {},
                 changedPaths if diff is not None and changedKeys else None)
+
+    def NarrowChangedKeys(changedPaths):
+        """Return DeepDiff include_paths giving the same diff as changedPaths.
+
+        DeepDiff rebuilds its whole tree for every included path, so paths
+        whose values didn't change are left out and changed dicts are narrowed
+        down to the keys that changed. At every dict level DeepDiff is made to
+        see enough keys to take the same decision as with the original paths
+        (see DIFF_DEEPER_THRESHOLD), so the resulting diff is identical.
+
+        Without changedPaths DeepDiff compares the whole state: [] is returned
+        if it is unchanged, None (no include_paths) otherwise.
+        """
+        if not changedPaths:
+            if StateManager._SameValue(StateManager.lastSavedState, StateManager.state):
+                return []
+            return None
+
+        if not all(StateManager._IsPlainKey(k) for path in changedPaths for k in path):
+            return list(set(
+                "root" + "".join(f"['{k}']" for k in path) for path in changedPaths))
+
+        # Tree of the changed paths, True where a whole subtree is included
+        tree = {}
+        for path in changedPaths:
+            node = tree
+            for k in path[:-1]:
+                if node.get(k) is True:
+                    break
+                node = node.setdefault(k, {})
+            else:
+                node[path[-1]] = True
+
+        result = []
+        StateManager._NarrowLevel(
+            StateManager.lastSavedState, StateManager.state, "root", tree, result)
+        return result
+
+    def _IsPlainKey(k):
+        # Keys that DeepDiff writes as ['key'] in its paths
+        return type(k) is str and repr(k) == f"'{k}'"
+
+    def _SameValue(a, b):
+        """True if DeepDiff would find no difference between a and b."""
+        if a is b:
+            return True
+        try:
+            if type(a) is not type(b) or a != b:
+                return False
+            if isinstance(a, (dict, list, tuple, float)):
+                # == alone treats 1, 1.0 and True as equal, DeepDiff doesn't
+                option = orjson.OPT_NON_STR_KEYS | orjson.OPT_SORT_KEYS
+                return orjson.dumps(a, option=option) == orjson.dumps(b, option=option)
+            return True
+        except Exception:
+            return False
+
+    def _DiffDeeper(intersect, union):
+        # Mirrors DeepDiff: a dict is reported as a single values_changed when
+        # too few of its compared keys exist on both sides.
+        return not (union > 1 and intersect / union < StateManager.DIFF_DEEPER_THRESHOLD)
+
+    def _OriginalPaths(key, tree, result):
+        if tree is True:
+            result.append(key)
+        else:
+            for k, subtree in tree.items():
+                StateManager._OriginalPaths(f"{key}['{k}']", subtree, result)
+
+    def _NarrowLevel(old, new, key, tree, result):
+        """Narrow the paths of tree, where DeepDiff only compares the keys of
+        old and new that are in tree."""
+        if tree is True:
+            StateManager._NarrowWhole(old, new, key, result)
+            return
+
+        if type(old) is not dict or type(new) is not dict or \
+                not all(StateManager._IsPlainKey(k) for k in old) or \
+                not all(StateManager._IsPlainKey(k) for k in new):
+            StateManager._OriginalPaths(key, tree, result)
+            return
+
+        added = [k for k in tree if k in new and k not in old]
+        removed = [k for k in tree if k in old and k not in new]
+        both = [k for k in tree if k in old and k in new]
+
+        if not StateManager._DiffDeeper(len(both), len(added) + len(removed) + len(both)):
+            # DeepDiff reports this dict as a whole, keep what it compares
+            StateManager._OriginalPaths(key, tree, result)
+            return
+
+        StateManager._NarrowChildren(
+            old, new, key, result, added, removed, both,
+            lambda k, childKey, out: StateManager._NarrowLevel(
+                old[k], new[k], childKey, tree[k], out),
+            lambda k, childKey, out: StateManager._OriginalPaths(
+                childKey, tree[k], out))
+
+    def _NarrowWhole(old, new, key, result):
+        """Narrow key, where DeepDiff compares the whole subtree."""
+        if StateManager._SameValue(old, new):
+            return
+
+        if type(old) is not dict or type(new) is not dict or \
+                not all(StateManager._IsPlainKey(k) for k in old) or \
+                not all(StateManager._IsPlainKey(k) for k in new):
+            result.append(key)
+            return
+
+        added = [k for k in new if k not in old]
+        removed = [k for k in old if k not in new]
+        both = [k for k in old if k in new]
+
+        if not StateManager._DiffDeeper(len(both), len(added) + len(removed) + len(both)):
+            result.append(key)
+            return
+
+        StateManager._NarrowChildren(
+            old, new, key, result, added, removed, both,
+            lambda k, childKey, out: StateManager._NarrowWhole(
+                old[k], new[k], childKey, out),
+            lambda k, childKey, out: out.append(childKey))
+
+    def _NarrowChildren(old, new, key, result, added, removed, both, narrow, keep):
+        changed = 0
+        unchanged = []
+        for k in both:
+            childResult = []
+            narrow(k, f"{key}['{k}']", childResult)
+            if childResult:
+                changed += 1
+                result.extend(childResult)
+            else:
+                unchanged.append(k)
+
+        reported = len(added) + len(removed) + changed
+        if reported == 0:
+            return
+
+        for k in added + removed:
+            result.append(f"{key}['{k}']")
+
+        # Leaving the unchanged keys out could make DeepDiff report this dict
+        # as a whole, so keep some of them in that case
+        for k in unchanged:
+            if StateManager._DiffDeeper(changed, reported):
+                break
+            keep(k, f"{key}['{k}']", result)
+            changed += 1
+            reported += 1
 
     def UpdateLastSavedState(changedPaths):
         """Copy the changed paths of the state into lastSavedState.

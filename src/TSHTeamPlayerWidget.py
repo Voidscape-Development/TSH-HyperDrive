@@ -777,17 +777,10 @@ class TSHTeamPlayerWidget(QGroupBox):
                 tag = data.get(
                     "prefix")+" "+data.get("gamerTag") if data.get("prefix") else data.get("gamerTag")
 
-                for i in range(TSHPlayerDB.model.rowCount()):
-                    item = TSHPlayerDB.model.item(
-                        i).data(Qt.ItemDataRole.UserRole)
-
-                    dbTag = item.get(
-                        "prefix")+" "+item.get("gamerTag") if item.get("prefix") else item.get("gamerTag")
-
-                    if tag == dbTag:
-                        self.SetData(item, dontLoadFromDB=True,
-                                     clear=False, no_mains=no_mains)
-                        break
+                item = TSHPlayerDB.GetPlayer(tag)
+                if item is not None:
+                    self.SetData(item, dontLoadFromDB=True,
+                                 clear=False, no_mains=no_mains)
 
             name = self.findChild(QWidget, "name")
             if data.get("gamerTag") and data.get("gamerTag") != name.text():

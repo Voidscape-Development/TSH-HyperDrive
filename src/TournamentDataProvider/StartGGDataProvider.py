@@ -1,7 +1,9 @@
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from http.cookiejar import DefaultCookiePolicy
 import re
 import requests
+import requests.adapters
 import os
 import traceback
 from loguru import logger
@@ -17,6 +19,22 @@ from ..Helpers.TSHLocaleHelper import TSHLocaleHelper
 from ..TSHBracket import is_power_of_two
 
 from ..Workers import Worker
+
+
+def _CreateSession():
+    # Shared by every start.gg request so the HTTPS connection is kept alive,
+    # instead of a new TCP + TLS handshake for every query.
+    session = requests.Session()
+    adapter = requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=16)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    # Like the plain requests.get/post calls this replaced, don't keep cookies
+    session.cookies.set_policy(DefaultCookiePolicy(allowed_domains=[]))
+    return session
+
+
+_session = _CreateSession()
+_sessionMethods = {requests.get: "GET", requests.post: "POST"}
 
 
 class StartGGDataProvider(TournamentDataProvider):
@@ -63,8 +81,11 @@ class StartGGDataProvider(TournamentDataProvider):
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
             })
             retries = 0
+            method = _sessionMethods.get(type)
+            send = (lambda url, **kwargs: _session.request(method, url, **kwargs)) \
+                if method else type
             while requestCode != 200 and retries < 10:
-                data = type(
+                data = send(
                     url,
                     timeout=self._request_timeout_secs,
                     headers=headers,

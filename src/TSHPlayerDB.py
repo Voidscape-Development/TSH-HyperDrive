@@ -9,7 +9,6 @@ import csv
 import traceback
 from loguru import logger
 
-from copy import deepcopy
 
 from .Helpers.TSHDictHelper import deep_clone
 from .Helpers.TSHQtHelper import gui_thread_sync
@@ -67,11 +66,10 @@ class TSHPlayerDB:
                 except Exception as e:
                     logger.error(traceback.format_exc())
 
-            with open('./user_data/local_players.json', 'rt', encoding='utf-8') as jsonfile:
+            with open('./user_data/local_players.json', 'rb') as jsonfile:
                 player_list = orjson.loads(jsonfile.read())
                 for player in player_list:
                     tag = player.get("prefix")+" "+player.get("gamerTag") if player.get("prefix") else player.get("gamerTag")
-                    logger.info(f"Loading player {tag} from local database")
                     if tag not in TSHPlayerDB.database:
                         TSHPlayerDB.database[tag] = player
 
@@ -149,6 +147,12 @@ class TSHPlayerDB:
 
         TSHPlayerDB.SaveDB()
         TSHPlayerDB.SetupModel()
+
+    @staticmethod
+    def GetPlayer(tag):
+        """Returns a copy of the player saved under tag (prefix + gamerTag), or None."""
+        player = TSHPlayerDB.database.get(tag)
+        return deep_clone(player) if player is not None else None
 
     @staticmethod
     def GetPlayerFromTag(tag):
@@ -247,20 +251,18 @@ class TSHPlayerDB:
     @staticmethod
     def SaveDB():
         try:
-            player_list = []
+            # One copy of the whole DB, taken in a single call so another
+            # thread changing it can't break the loop below
+            players = deep_clone(list(TSHPlayerDB.database.values()))
 
-            for player in TSHPlayerDB.database.values():
-                if player is not None:
-                    playerData = deep_clone(player)
+            player_list = [
+                {k: v for k, v in player.items() if k in TSHPlayerDB.fieldnames}
+                for player in players if player is not None
+            ]
 
-                    for key in deepcopy(list(playerData.keys())):
-                        if key not in TSHPlayerDB.fieldnames:
-                            del playerData[key]
-
-                    player_list.append(playerData)
-
-            with open('./user_data/local_players.json', 'wt', encoding="utf-8") as outfile:
-                outfile.write(json.dumps(player_list, indent=2))
+            with open('./user_data/local_players.json', 'wb') as outfile:
+                outfile.write(orjson.dumps(
+                    player_list, option=orjson.OPT_INDENT_2 | orjson.OPT_NON_STR_KEYS))
         except Exception as e:
             logger.error(traceback.format_exc())
 
