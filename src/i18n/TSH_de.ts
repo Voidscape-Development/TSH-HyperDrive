@@ -804,21 +804,31 @@ p, li { white-space: pre-wrap; }
         <translation>Spielerliste</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="90"/>
+        <location filename="../TSHBracketWidget.py" line="91"/>
         <location filename="../TSHPlayerListWidget.py" line="57"/>
         <source>Number of slots</source>
         <translation>Zahl der Slots</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="101"/>
+        <location filename="../TSHBracketWidget.py" line="102"/>
         <location filename="../TSHPlayerListWidget.py" line="66"/>
         <source>Players per slot</source>
         <translation>Spieler pro Slot</translation>
     </message>
     <message>
+        <location filename="../TSHBracketWidget.py" line="249"/>
+        <source>Show player list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../TSHBracketWidget.py" line="252"/>
+        <source>Hide player list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../TSHCommentaryWidget.py" line="52"/>
         <location filename="../TSHScoreboardWidget.py" line="172"/>
-        <location filename="../TSHBracketWidget.py" line="110"/>
+        <location filename="../TSHBracketWidget.py" line="111"/>
         <location filename="../TSHPlayerListWidget.py" line="75"/>
         <source>Characters per player</source>
         <translation>Charaktere pro Slot</translation>
@@ -1603,7 +1613,7 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../TSHScoreboardWidget.py" line="669"/>
         <location filename="../TSHScoreboardWidget.py" line="691"/>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="887"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="910"/>
         <location filename="../TournamentStreamHelper.py" line="198"/>
         <location filename="../TournamentStreamHelper.py" line="234"/>
         <location filename="../TournamentStreamHelper.py" line="747"/>
@@ -1745,22 +1755,22 @@ p, li { white-space: pre-wrap; }
         <translation></translation>
     </message>
     <message>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="825"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="848"/>
         <source>Bold Italic</source>
         <translation>fett kursiv</translation>
     </message>
     <message>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="823"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="846"/>
         <source>Bold</source>
         <translation>fett</translation>
     </message>
     <message>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="822"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="845"/>
         <source>Regular</source>
         <translation>normal</translation>
     </message>
     <message>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="824"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="847"/>
         <source>Italic</source>
         <translation>kursiv</translation>
     </message>
@@ -2475,7 +2485,7 @@ p, li { white-space: pre-wrap; }
     <name>thumb_app</name>
     <message>
         <location filename="../TSHScoreboardWidget.py" line="637"/>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="885"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="908"/>
         <source>TSH - Thumbnail</source>
         <translation></translation>
     </message>

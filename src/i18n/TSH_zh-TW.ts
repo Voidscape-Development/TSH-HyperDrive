@@ -795,7 +795,7 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../TSHScoreboardWidget.py" line="669"/>
         <location filename="../TSHScoreboardWidget.py" line="691"/>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="887"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="910"/>
         <location filename="../TournamentStreamHelper.py" line="198"/>
         <location filename="../TournamentStreamHelper.py" line="234"/>
         <location filename="../TournamentStreamHelper.py" line="747"/>
@@ -1235,21 +1235,31 @@ p, li { white-space: pre-wrap; }
         <translation>下載失敗：</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="90"/>
+        <location filename="../TSHBracketWidget.py" line="91"/>
         <location filename="../TSHPlayerListWidget.py" line="57"/>
         <source>Number of slots</source>
         <translation>選手/隊伍數量</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="101"/>
+        <location filename="../TSHBracketWidget.py" line="102"/>
         <location filename="../TSHPlayerListWidget.py" line="66"/>
         <source>Players per slot</source>
         <translation>每個隊伍的選手數量</translation>
     </message>
     <message>
+        <location filename="../TSHBracketWidget.py" line="249"/>
+        <source>Show player list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../TSHBracketWidget.py" line="252"/>
+        <source>Hide player list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../TSHCommentaryWidget.py" line="52"/>
         <location filename="../TSHScoreboardWidget.py" line="172"/>
-        <location filename="../TSHBracketWidget.py" line="110"/>
+        <location filename="../TSHBracketWidget.py" line="111"/>
         <location filename="../TSHPlayerListWidget.py" line="75"/>
         <source>Characters per player</source>
         <translation>每位選手使用的角色數量</translation>
@@ -1625,22 +1635,22 @@ p, li { white-space: pre-wrap; }
         <translation>先勝局數</translation>
     </message>
     <message>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="822"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="845"/>
         <source>Regular</source>
         <translation>常規</translation>
     </message>
     <message>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="823"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="846"/>
         <source>Bold</source>
         <translation>粗體</translation>
     </message>
     <message>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="824"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="847"/>
         <source>Italic</source>
         <translation>斜體</translation>
     </message>
     <message>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="825"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="848"/>
         <source>Bold Italic</source>
         <translation>粗斜體</translation>
     </message>
@@ -2446,7 +2456,7 @@ p, li { white-space: pre-wrap; }
     <name>thumb_app</name>
     <message>
         <location filename="../TSHScoreboardWidget.py" line="637"/>
-        <location filename="../TSHThumbnailSettingsWidget.py" line="885"/>
+        <location filename="../TSHThumbnailSettingsWidget.py" line="908"/>
         <source>TSH - Thumbnail</source>
         <translation>TSH-縮略圖</translation>
     </message>
