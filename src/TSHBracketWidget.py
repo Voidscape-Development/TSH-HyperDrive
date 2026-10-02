@@ -47,10 +47,17 @@ class TSHBracketWidget(QDockWidget):
         self.updatingPhaseGroup = False
         self.pendingPhaseGroupData = None
 
+        # Entrants of the loaded phase group, so mains fetched in the
+        # background after the load can be applied to their slots
+        self.loadedEntrants = []
+        self.mainsAppliedSlots = set()
+
         TSHTournamentDataProvider.instance.signals.tournament_phases_updated.connect(
             self.UpdatePhases)
         TSHTournamentDataProvider.instance.signals.tournament_phasegroup_updated.connect(
             self.UpdatePhaseGroup)
+        TSHTournamentDataProvider.instance.signals.player_mains_updated.connect(
+            self.ApplyFetchedMains)
 
         self.signals = TSHBracketWidgetSignals()
 
@@ -282,8 +289,8 @@ class TSHBracketWidget(QDockWidget):
                 _set.finished = False
 
     def UpdatePhaseGroup(self, phaseGroupData):
-        # This method pumps the event loop (processEvents) while it runs, so a
-        # second phase group payload can be delivered right in the middle of it.
+        # Loading players can still end up pumping the event loop, so a second
+        # phase group payload could be delivered right in the middle of this.
         # Re-entering would unbalance the DataChanged connection and the save
         # block, so newer data is queued and applied after the current run.
         if self.updatingPhaseGroup:
@@ -314,6 +321,10 @@ class TSHBracketWidget(QDockWidget):
             # Nothing was connected; don't reconnect something we didn't unhook.
             reconnectDataChanged = False
 
+        # Don't repaint the bracket and player list after every single change
+        self.bracketView.setUpdatesEnabled(False)
+        self.playerList.setUpdatesEnabled(False)
+
         try:
             # logger.info("Phase Group Data: " + str(phaseGroupData))
 
@@ -330,34 +341,32 @@ class TSHBracketWidget(QDockWidget):
                     "Phase group fetch looks partial (no entrants but sets present); skipping bracket rebuild")
                 return
 
-            if phaseGroupData.get("progressionsIn", {}) != None:
+            # Each of these controls rebuilds the whole bracket when changed.
+            # The bracket is rebuilt once below, so don't let them do it too.
+            controls = [self.progressionsIn,
+                        self.progressionsOut, self.winnersOnly]
+            for control in controls:
+                control.blockSignals(True)
+            try:
                 self.progressionsIn.setValue(
-                    len(phaseGroupData.get("progressionsIn", {})))
-            else:
-                self.progressionsIn.setValue(0)
-
-            if phaseGroupData.get("progressionsOut", {}) != None:
+                    len(phaseGroupData.get("progressionsIn") or []))
                 self.progressionsOut.setValue(
-                    len(phaseGroupData.get("progressionsOut", {})))
-            else:
-                self.progressionsOut.setValue(0)
-
-            if phaseGroupData.get("winnersOnlyProgressions", False) != None:
+                    len(phaseGroupData.get("progressionsOut") or []))
                 self.winnersOnly.setChecked(
-                    phaseGroupData.get("winnersOnlyProgressions", False))
-            else:
-                self.winnersOnly.setChecked(False)
+                    bool(phaseGroupData.get("winnersOnlyProgressions", False)))
+            finally:
+                for control in controls:
+                    control.blockSignals(False)
 
             self.bracket.customSeeding = phaseGroupData.get(
                 "customSeeding", False)
 
-            # Make sure progressions are exported
-            QGuiApplication.processEvents()
-
-            self.playerList.LoadFromStandings(entrants)
-
-            # Wait for the player list to update
-            QGuiApplication.processEvents()
+            # Mains that aren't cached yet are fetched in the background and
+            # applied by ApplyFetchedMains, instead of one request per player
+            # on the UI thread
+            self.loadedEntrants = entrants
+            self.mainsAppliedSlots = set()
+            self.playerList.LoadFromStandings(entrants, enrichBlocking=False)
 
             self.slotNumber.blockSignals(True)
             self.slotNumber.setValue(len(self.playerList.slotWidgets))
@@ -373,7 +382,7 @@ class TSHBracketWidget(QDockWidget):
                 phaseGroupData.get("customSeeding", False)
             )
 
-            for r, round in (phaseGroupData.get("sets") or {}).items():
+            for r, round in sets.items():
                 for s, _set in enumerate(round):
                     try:
                         score = _set.get("score")
@@ -390,15 +399,50 @@ class TSHBracketWidget(QDockWidget):
                     except Exception as e:
                         logger.error(traceback.format_exc())
 
-            QGuiApplication.processEvents()
-            self.bracket.UpdateBracket()
             self.bracketView.Update()
         except:
             logger.error(traceback.format_exc())
         finally:
+            self.bracketView.setUpdatesEnabled(True)
+            self.playerList.setUpdatesEnabled(True)
             if reconnectDataChanged:
                 self.playerList.signals.DataChanged.connect(
                     self.bracketView.Update)
+
+    def ApplyFetchedMains(self):
+        provider = TSHTournamentDataProvider.instance.provider
+        if provider is None or not self.loadedEntrants:
+            return
+
+        slots = self.playerList.slotWidgets
+        toUpdate = []
+
+        for i, entrant in enumerate(self.loadedEntrants):
+            if i >= len(slots):
+                break
+            if i in self.mainsAppliedSlots:
+                continue
+            for player in (entrant or {}).get("players") or []:
+                if not player.get("mains") and provider.GetCachedMains(player):
+                    toUpdate.append(i)
+                    break
+
+        if not toUpdate:
+            return
+
+        self.mainsAppliedSlots.update(toUpdate)
+
+        with StateManager.SaveBlock():
+            self.playerList.childDataChangedLock = True
+            try:
+                for i in toUpdate:
+                    # Reloading the slot picks the mains up from the cache
+                    slots[i].SetTeamData(
+                        self.loadedEntrants[i], enrichBlocking=False)
+            except:
+                logger.error(traceback.format_exc())
+            finally:
+                self.playerList.childDataChangedLock = False
 
     def SetDefaultsFromAssets(self):
         if StateManager.Get(f'game.defaults'):

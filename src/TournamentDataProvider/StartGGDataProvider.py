@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.cookiejar import DefaultCookiePolicy
 import re
@@ -68,6 +68,12 @@ class StartGGDataProvider(TournamentDataProvider):
         super().__init__(url, threadpool, tshTdp)
         self.name = "StartGG"
         self._mains_cache = {}
+        # Players whose mains a bulk load (e.g. the bracket) needs, fetched
+        # one by one in the background instead of on the UI thread
+        self._mainsQueue = deque()
+        self._mainsQueued = set()
+        self._mainsQueueLock = threading.Lock()
+        self._mainsQueueThread = None
 
     # Queries the provided URL until a proper 200 status code has been provided back
     #
@@ -1969,11 +1975,18 @@ class StartGGDataProvider(TournamentDataProvider):
 
             found = []
             for slug, player in todo:
+                # Players a bulk load is waiting on go first; both loops
+                # share the same request budget
+                while self._mainsQueue:
+                    time.sleep(self._prewarm_interval_secs)
+
                 # Stop if the user switched tournament or game meanwhile
                 if getattr(self.tshTdp, "provider", self) is not self:
                     break
                 if (TSHGameAssetManager.instance.selectedGame or {}).get("smashgg_game_id") != videogameId:
                     break
+                if (slug, videogameId) in self._mains_cache:
+                    continue
 
                 mains = self._FetchUserMains(slug, videogameId)
                 if mains is not None:
@@ -2112,7 +2125,7 @@ class StartGGDataProvider(TournamentDataProvider):
 
         return (playerData)
 
-    def EnrichPlayerData(self, playerData):
+    def EnrichPlayerData(self, playerData, blocking=True):
         # Lazy mains fill for entrants loaded via GetTournamentPhaseGroup.
         # That query no longer embeds the per-entrant sets->games->selections
         # lookup (it single-handedly pushed StartGG's GraphQL complexity
@@ -2131,6 +2144,9 @@ class StartGGDataProvider(TournamentDataProvider):
         key = (slug, videogameId)
         if key in self._mains_cache:
             mains = self._mains_cache[key]
+        elif not blocking:
+            self._QueueMainsFetch(playerData, videogameId)
+            return playerData
         else:
             mains = self._FetchUserMains(slug, videogameId)
             # A failed lookup isn't cached, so it gets retried next load
@@ -2139,6 +2155,88 @@ class StartGGDataProvider(TournamentDataProvider):
         if mains:
             playerData["mains"] = mains
         return playerData
+
+    def GetCachedMains(self, playerData):
+        slug = (playerData or {}).get("startgg_user_slug")
+        videogameId = (TSHGameAssetManager.instance.selectedGame or {}).get(
+            "smashgg_game_id")
+        if not slug or not videogameId:
+            return None
+        return self._mains_cache.get((slug, videogameId))
+
+    def _QueueMainsFetch(self, player, videogameId):
+        slug = player.get("startgg_user_slug")
+        key = (slug, videogameId)
+
+        # Players that already have mains saved for this game don't need them
+        gameCodename = (TSHGameAssetManager.instance.selectedGame or {}).get("codename")
+        tag = player.get("prefix")+" "+player.get("gamerTag") \
+            if player.get("prefix") else player.get("gamerTag")
+        try:
+            dbMains = (TSHPlayerDB.database.get(tag) or {}).get("mains") or {}
+            if isinstance(dbMains, str):
+                dbMains = orjson.loads(dbMains)
+            if gameCodename and dbMains.get(gameCodename):
+                return
+        except Exception:
+            pass
+
+        with self._mainsQueueLock:
+            if key in self._mainsQueued:
+                return
+            self._mainsQueued.add(key)
+            self._mainsQueue.append((key, {
+                "prefix": player.get("prefix"),
+                "gamerTag": player.get("gamerTag"),
+            }))
+
+            if self._mainsQueueThread is None:
+                self._mainsQueueThread = threading.Thread(
+                    target=self._MainsQueueWorker,
+                    name="StartGGMainsQueue", daemon=True
+                )
+                self._mainsQueueThread.start()
+
+    def _MainsQueueWorker(self):
+        found = []
+        fetched = 0
+        while True:
+            with self._mainsQueueLock:
+                if not self._mainsQueue:
+                    self._mainsQueueThread = None
+                    break
+                key, player = self._mainsQueue.popleft()
+
+            try:
+                slug, videogameId = key
+                if key not in self._mains_cache:
+                    mains = self._FetchUserMains(slug, videogameId)
+                    if mains is not None:
+                        self._mains_cache[key] = mains
+                    if mains:
+                        found.append({
+                            "prefix": player.get("prefix"),
+                            "gamerTag": player.get("gamerTag"),
+                            "mains": {g: [list(m) for m in ms] for g, ms in mains.items()},
+                        })
+                    fetched += 1
+                    time.sleep(self._prewarm_interval_secs)
+            except Exception:
+                logger.error(traceback.format_exc())
+            finally:
+                with self._mainsQueueLock:
+                    self._mainsQueued.discard(key)
+
+            # Let whoever is waiting on these pick them up in batches
+            if fetched >= 8 or not self._mainsQueue:
+                fetched = 0
+                try:
+                    if found:
+                        TSHPlayerDB.AddPlayers(found)
+                        found = []
+                    self.tshTdp.signals.player_mains_updated.emit()
+                except Exception:
+                    logger.error(traceback.format_exc())
 
     def GetUserMains(self, slug, videogameId):
         # Per-user mains lookup (no other code path fetches mains for a

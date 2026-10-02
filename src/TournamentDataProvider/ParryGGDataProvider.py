@@ -1258,7 +1258,7 @@ class ParryGGDataProvider(TournamentDataProvider):
         )
         return (cb.result or {}).get("sets", [])
 
-    def EnrichPlayerData(self, playerData):
+    def EnrichPlayerData(self, playerData, blocking=True):
         # Lazy mains fill from a linked start.gg account. Fires once per
         # SetData; cached at every layer (linked-account, player-id,
         # mains) so repeated slot loads are free.
@@ -1267,6 +1267,8 @@ class ParryGGDataProvider(TournamentDataProvider):
         ids = playerData.get("id") or []
         user_id = ids[1] if len(ids) > 1 else None
         if not user_id:
+            return playerData
+        if not blocking and user_id not in (self._startgg_mains_cache or {}):
             return playerData
         mains = self._fetch_startgg_mains(user_id)
         if mains:

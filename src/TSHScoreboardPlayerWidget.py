@@ -746,7 +746,7 @@ class TSHScoreboardPlayerWidget(QGroupBox):
             self.ManageSavePlayerToDBText()
             self.ManageDeletePlayerFromDBActive()
 
-    def SetData(self, data, dontLoadFromDB=False, clear=True, no_mains=False):
+    def SetData(self, data, dontLoadFromDB=False, clear=True, no_mains=False, enrichBlocking=True):
         self.dataLock.acquire()
 
         logger.debug(f"Setting data for {self.path}: {data}")
@@ -769,16 +769,21 @@ class TSHScoreboardPlayerWidget(QGroupBox):
                 item = TSHPlayerDB.GetPlayer(tag)
                 if item is not None:
                     self.SetData(item, dontLoadFromDB=True,
-                                 clear=False, no_mains=no_mains)
+                                 clear=False, no_mains=no_mains,
+                                 enrichBlocking=enrichBlocking)
                     if SettingsManager.Get("general.disable_overwrite", False):
                         data = data | item
 
             # Provider-side lazy enrichment (e.g. parry → mains from a
             # linked start.gg account). No-op for providers that don't
             # override EnrichPlayerData; cached so repeated loads are free.
+            # Bulk loads (e.g. a whole bracket) pass enrichBlocking=False so
+            # a cache miss is fetched in the background instead of making a
+            # network request per player on the UI thread.
             provider = TSHTournamentDataProvider.instance.provider if TSHTournamentDataProvider.instance else None
             if provider is not None:
-                data = provider.EnrichPlayerData(data) or data
+                data = provider.EnrichPlayerData(
+                    data, blocking=enrichBlocking) or data
 
             name = self.findChild(QWidget, "name")
             if data.get("gamerTag") and data.get("gamerTag") != name.text():

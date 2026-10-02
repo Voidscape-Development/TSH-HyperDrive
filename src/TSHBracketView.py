@@ -93,7 +93,14 @@ class BracketSetWidget(QWidget):
             self.bracketSet.bracket.UpdateBracket()
             self.bracketView.Update()
 
-    def Update(self):
+    @staticmethod
+    def _SetStyle(widget, styleSheet):
+        # Setting a style sheet restyles the widget even if it didn't change,
+        # which adds up quickly over every set of a big bracket
+        if widget.styleSheet() != styleSheet:
+            widget.setStyleSheet(styleSheet)
+
+    def Update(self, offsets=None):
         if self.bracketSet is not None:
             self.playerId[0].setText(str(self.bracketSet.playerIds[0]))
             self.playerId[1].setText(str(self.bracketSet.playerIds[1]))
@@ -112,21 +119,19 @@ class BracketSetWidget(QWidget):
             self.score[0].blockSignals(False)
             self.score[1].blockSignals(False)
 
+            won = "background-color: rgba(0, 255, 0, 50);"
+            dimmed = "background-color: rgba(0, 0, 0, 80);"
+            clear = "background-color: rgba(0, 0, 0, 0);"
+
             if self.bracketSet.score[0] > self.bracketSet.score[1]:
-                self.score[0].setStyleSheet(
-                    "background-color: rgba(0, 255, 0, 50);")
-                self.score[1].setStyleSheet(
-                    "background-color: rgba(0, 0, 0, 80);")
+                self._SetStyle(self.score[0], won)
+                self._SetStyle(self.score[1], dimmed)
             elif self.bracketSet.score[0] < self.bracketSet.score[1]:
-                self.score[1].setStyleSheet(
-                    "background-color: rgba(0, 255, 0, 50);")
-                self.score[0].setStyleSheet(
-                    "background-color: rgba(0, 0, 0, 80);")
+                self._SetStyle(self.score[1], won)
+                self._SetStyle(self.score[0], dimmed)
             else:
-                self.score[0].setStyleSheet(
-                    "background-color: rgba(0, 0, 0, 80);")
-                self.score[1].setStyleSheet(
-                    "background-color: rgba(0, 0, 0, 80);")
+                self._SetStyle(self.score[0], dimmed)
+                self._SetStyle(self.score[1], dimmed)
 
             try:
                 if (self.bracketSet.playerIds[0]-1) < len(self.bracketView.playerList.slotWidgets) and self.bracketSet.playerIds[0] > 0:
@@ -163,7 +168,6 @@ class BracketSetWidget(QWidget):
                 self.finished.setChecked(self.bracketSet.finished)
                 self.finished.blockSignals(False)
 
-            winnersCutout, losersCutout = self.bracketView.GetCutouts()
             hasBye = \
                 ((self.bracketSet.playerIds[0] == -1 and not self.bracketSet.playerIds[1] == -1) or
                  (self.bracketSet.playerIds[1] == -1 and not self.bracketSet.playerIds[0] == -1))
@@ -175,30 +179,21 @@ class BracketSetWidget(QWidget):
             else:
                 self.show()
 
-            limitExportNumber, winnersOffset, losersOffset = self.bracketView.GetLimitedExportingBracketOffsets()
+            # Same for every set, so TSHBracketView.Update passes it in
+            if offsets is None:
+                offsets = self.bracketView.GetLimitedExportingBracketOffsets()
+            limitExportNumber, winnersOffset, losersOffset = offsets
 
             if self.bracketSet.pos[0] > 0:
-                if self.bracketSet.pos[0] - winnersOffset <= 0:
-                    self.name[0].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 80);")
-                    self.name[1].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 80);")
-                else:
-                    self.name[0].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 0);")
-                    self.name[1].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 0);")
+                cut = self.bracketSet.pos[0] - winnersOffset <= 0
             elif self.bracketSet.pos[0] < 0:
-                if self.bracketSet.pos[0] + losersOffset >= 0:
-                    self.name[0].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 80);")
-                    self.name[1].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 80);")
-                else:
-                    self.name[0].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 0);")
-                    self.name[1].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 0);")
+                cut = self.bracketSet.pos[0] + losersOffset >= 0
+            else:
+                cut = None
+
+            if cut is not None:
+                self._SetStyle(self.name[0], dimmed if cut else clear)
+                self._SetStyle(self.name[1], dimmed if cut else clear)
 
 
 class TSHBracketView(QGraphicsView):
@@ -222,9 +217,16 @@ class TSHBracketView(QGraphicsView):
         self.setFrameShape(QFrame.NoFrame)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
 
-        self.SetBracket(bracket)
-
         self.bracketLines = []
+
+        # Lines and zoom depend on the final widget geometry, which is only
+        # known once Qt has processed the layout requests. Instead of forcing
+        # that with processEvents() (which repaints a half built bracket and
+        # lets other signals re-enter us), redraw on the next loop iteration.
+        self._redrawPending = False
+        self._fitPending = False
+
+        self.SetBracket(bracket)
 
     def GetCutouts(self, forExport=False):
         winnersRounds = [r for r in self.bracket.rounds.keys() if int(r) > 0]
@@ -363,9 +365,27 @@ class TSHBracketView(QGraphicsView):
             self.bracketWidgets.append(roundWidgets)
             currentWidgets.append(roundWidgets)
 
-        QGuiApplication.processEvents()
-        self.DrawLines()
-        self.fitInView()
+        self.ScheduleRedraw(fit=True)
+
+    def ScheduleRedraw(self, fit=False):
+        self._fitPending = self._fitPending or fit
+        if self._redrawPending:
+            return
+        self._redrawPending = True
+        QTimer.singleShot(0, self._Redraw)
+
+    def _Redraw(self):
+        self._redrawPending = False
+        fit = self._fitPending
+        self._fitPending = False
+        try:
+            self.DrawLines()
+            if fit:
+                self.fitInView()
+        except RuntimeError:
+            # The bracket widgets were replaced in the meantime; the rebuild
+            # schedules its own redraw
+            logger.warning("Bracket widgets deleted before redraw")
 
     def GetLimitedExportingBracketOffsets(self):
         limitExportNumber = -1
@@ -406,17 +426,17 @@ class TSHBracketView(QGraphicsView):
     def Update(self):
         self.bracket.UpdateBracket()
 
+        offsets = self.GetLimitedExportingBracketOffsets()
+
         for round in self.bracketWidgets:
             for setWidget in round:
                 for w in setWidget.score:
                     w.blockSignals(True)
-                setWidget.Update()
+                setWidget.Update(offsets)
                 for w in setWidget.score:
                     w.blockSignals(False)
 
-        QGuiApplication.processEvents()
-
-        self.DrawLines()
+        self.ScheduleRedraw()
 
         with StateManager.SaveBlock():
             self.ExportBracketState()
