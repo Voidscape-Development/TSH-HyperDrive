@@ -1006,8 +1006,8 @@ p, li { white-space: pre-wrap; }
         <location filename="../TSHAssetDownloader.py" line="335"/>
         <location filename="../TSHAssetDownloader.py" line="543"/>
         <location filename="../TournamentStreamHelper.py" line="1216"/>
-        <location filename="../TSHTournamentDataProvider.py" line="231"/>
-        <location filename="../TSHTournamentDataProvider.py" line="255"/>
+        <location filename="../TSHTournamentDataProvider.py" line="232"/>
+        <location filename="../TSHTournamentDataProvider.py" line="256"/>
         <location filename="../Helpers/TSHDownloadHelper.py" line="210"/>
         <source>Cancel</source>
         <translation>キャンセル</translation>
@@ -1271,31 +1271,46 @@ p, li { white-space: pre-wrap; }
         <translation>解説者{0}</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="91"/>
+        <location filename="../TSHBracketWidget.py" line="97"/>
         <location filename="../TSHPlayerListWidget.py" line="57"/>
         <source>Number of slots</source>
         <translation>スロットの数</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="102"/>
+        <location filename="../TSHBracketWidget.py" line="110"/>
         <location filename="../TSHPlayerListWidget.py" line="66"/>
         <source>Players per slot</source>
         <translation>各スロットのプレイヤー数</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="249"/>
+        <location filename="../TSHBracketWidget.py" line="151"/>
+        <source>Reload the whole phase group, including its players</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../TSHBracketWidget.py" line="159"/>
+        <source>Update sets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../TSHBracketWidget.py" line="160"/>
+        <source>Update only the set results of the loaded bracket, without reloading its players</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../TSHBracketWidget.py" line="272"/>
         <source>Show player list</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="252"/>
+        <location filename="../TSHBracketWidget.py" line="275"/>
         <source>Hide player list</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../TSHCommentaryWidget.py" line="52"/>
         <location filename="../TSHScoreboardWidget.py" line="172"/>
-        <location filename="../TSHBracketWidget.py" line="111"/>
+        <location filename="../TSHBracketWidget.py" line="119"/>
         <location filename="../TSHPlayerListWidget.py" line="75"/>
         <source>Characters per player</source>
         <translation>各プレイヤーの使用キャラクター数</translation>
@@ -1393,59 +1408,59 @@ p, li { white-space: pre-wrap; }
         <translation>banByMaxGamesのテキストが無効です。</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="96"/>
+        <location filename="../TSHTournamentDataProvider.py" line="97"/>
         <source>Parry.gg API key has not been set. Please configure it in Settings &gt; API Keys.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="97"/>
+        <location filename="../TSHTournamentDataProvider.py" line="98"/>
         <source>API keys can be created at: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="167"/>
+        <location filename="../TSHTournamentDataProvider.py" line="168"/>
         <source>Paste the tournament URL.</source>
         <translation>大会のURLをここに貼って下さい</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="167"/>
+        <location filename="../TSHTournamentDataProvider.py" line="168"/>
         <source>For StartGG, the link must contain the /event/ part</source>
         <translation>StartGGのリンクには/event/partを含めて下さい</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="167"/>
+        <location filename="../TSHTournamentDataProvider.py" line="168"/>
         <source>Supported providers:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="172"/>
-        <location filename="../TSHTournamentDataProvider.py" line="232"/>
-        <location filename="../TSHTournamentDataProvider.py" line="256"/>
+        <location filename="../TSHTournamentDataProvider.py" line="173"/>
+        <location filename="../TSHTournamentDataProvider.py" line="233"/>
+        <location filename="../TSHTournamentDataProvider.py" line="257"/>
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="196"/>
+        <location filename="../TSHTournamentDataProvider.py" line="197"/>
         <source>Set tournament URL</source>
         <translation>大会のURLを貼る</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="229"/>
+        <location filename="../TSHTournamentDataProvider.py" line="230"/>
         <source>Set Twitch username</source>
         <translation>Twitchでのユーザー名を入力</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="230"/>
+        <location filename="../TSHTournamentDataProvider.py" line="231"/>
         <source>Twitch Username:</source>
         <translation>Twitchでのユーザー名:</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="241"/>
+        <location filename="../TSHTournamentDataProvider.py" line="242"/>
         <source>Paste the URL to the player&apos;s StartGG profile</source>
         <translation>プレイヤーのStartGGのプロフィールへのURLをここに貼ってください</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="245"/>
+        <location filename="../TSHTournamentDataProvider.py" line="246"/>
         <source>Paste the URL to the player&apos;s ParryGG profile</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1454,12 +1469,12 @@ p, li { white-space: pre-wrap; }
         <translation>ブラケット表にプレイヤー名を記入して下さい</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="248"/>
+        <location filename="../TSHTournamentDataProvider.py" line="249"/>
         <source>Invalid tournament data provider</source>
         <translation>無効な大会データプロバイダです</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="253"/>
+        <location filename="../TSHTournamentDataProvider.py" line="254"/>
         <source>Set player</source>
         <translation>プレイヤーを選ぶ</translation>
     </message>
@@ -1807,7 +1822,7 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../TSHTournamentInfoWidget.py" line="147"/>
         <location filename="../TSHTournamentInfoWidget.py" line="148"/>
-        <location filename="../TSHTournamentDataProvider.py" line="93"/>
+        <location filename="../TSHTournamentDataProvider.py" line="94"/>
         <source>Error</source>
         <translation type="unfinished"></translation>
     </message>

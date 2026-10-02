@@ -949,8 +949,8 @@ p, li { white-space: pre-wrap; }
         <location filename="../TSHAssetDownloader.py" line="335"/>
         <location filename="../TSHAssetDownloader.py" line="543"/>
         <location filename="../TournamentStreamHelper.py" line="1216"/>
-        <location filename="../TSHTournamentDataProvider.py" line="231"/>
-        <location filename="../TSHTournamentDataProvider.py" line="255"/>
+        <location filename="../TSHTournamentDataProvider.py" line="232"/>
+        <location filename="../TSHTournamentDataProvider.py" line="256"/>
         <location filename="../Helpers/TSHDownloadHelper.py" line="210"/>
         <source>Cancel</source>
         <translation>Cancelar</translation>
@@ -1326,31 +1326,46 @@ p, li { white-space: pre-wrap; }
         <translation>Comentarista {0}</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="91"/>
+        <location filename="../TSHBracketWidget.py" line="97"/>
         <location filename="../TSHPlayerListWidget.py" line="57"/>
         <source>Number of slots</source>
         <translation>Número de grupos</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="102"/>
+        <location filename="../TSHBracketWidget.py" line="110"/>
         <location filename="../TSHPlayerListWidget.py" line="66"/>
         <source>Players per slot</source>
         <translation>Jogadores por grupo</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="249"/>
+        <location filename="../TSHBracketWidget.py" line="151"/>
+        <source>Reload the whole phase group, including its players</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../TSHBracketWidget.py" line="159"/>
+        <source>Update sets</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../TSHBracketWidget.py" line="160"/>
+        <source>Update only the set results of the loaded bracket, without reloading its players</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../TSHBracketWidget.py" line="272"/>
         <source>Show player list</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="252"/>
+        <location filename="../TSHBracketWidget.py" line="275"/>
         <source>Hide player list</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../TSHCommentaryWidget.py" line="52"/>
         <location filename="../TSHScoreboardWidget.py" line="172"/>
-        <location filename="../TSHBracketWidget.py" line="111"/>
+        <location filename="../TSHBracketWidget.py" line="119"/>
         <location filename="../TSHPlayerListWidget.py" line="75"/>
         <source>Characters per player</source>
         <translation>Personagens por jogador</translation>
@@ -1448,59 +1463,59 @@ p, li { white-space: pre-wrap; }
         <translation>O texto para bans por número de partidas é inválido.</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="96"/>
+        <location filename="../TSHTournamentDataProvider.py" line="97"/>
         <source>Parry.gg API key has not been set. Please configure it in Settings &gt; API Keys.</source>
         <translation>A chave de API do Parry.gg não foi configurada. Configure-a em Configurações &gt; Chaves de API.</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="97"/>
+        <location filename="../TSHTournamentDataProvider.py" line="98"/>
         <source>API keys can be created at: </source>
         <translation>Chaves de API podem ser criadas em: </translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="167"/>
+        <location filename="../TSHTournamentDataProvider.py" line="168"/>
         <source>Paste the tournament URL.</source>
         <translation>Cole a URL do torneio.</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="167"/>
+        <location filename="../TSHTournamentDataProvider.py" line="168"/>
         <source>For StartGG, the link must contain the /event/ part</source>
         <translation>Para o StartGG, o link deve conter /evento/</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="167"/>
+        <location filename="../TSHTournamentDataProvider.py" line="168"/>
         <source>Supported providers:</source>
         <translation>Provedores suportados:</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="172"/>
-        <location filename="../TSHTournamentDataProvider.py" line="232"/>
-        <location filename="../TSHTournamentDataProvider.py" line="256"/>
+        <location filename="../TSHTournamentDataProvider.py" line="173"/>
+        <location filename="../TSHTournamentDataProvider.py" line="233"/>
+        <location filename="../TSHTournamentDataProvider.py" line="257"/>
         <source>OK</source>
         <translation>OK</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="196"/>
+        <location filename="../TSHTournamentDataProvider.py" line="197"/>
         <source>Set tournament URL</source>
         <translation>Definir a URL do torneio</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="229"/>
+        <location filename="../TSHTournamentDataProvider.py" line="230"/>
         <source>Set Twitch username</source>
         <translation>Definir o nome de usuário do Twitch</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="230"/>
+        <location filename="../TSHTournamentDataProvider.py" line="231"/>
         <source>Twitch Username:</source>
         <translation>Nome de usuário no Twitch:</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="241"/>
+        <location filename="../TSHTournamentDataProvider.py" line="242"/>
         <source>Paste the URL to the player&apos;s StartGG profile</source>
         <translation>Cole a URL para o perfil do jogador no StartGG</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="245"/>
+        <location filename="../TSHTournamentDataProvider.py" line="246"/>
         <source>Paste the URL to the player&apos;s ParryGG profile</source>
         <translation>Cole a URL para o perfil do jogador no ParryGG</translation>
     </message>
@@ -1618,12 +1633,12 @@ p, li { white-space: pre-wrap; }
         <translation>Insira o nome do jogador na bracket</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="248"/>
+        <location filename="../TSHTournamentDataProvider.py" line="249"/>
         <source>Invalid tournament data provider</source>
         <translation>Provedor de dados de torneio inválido</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="253"/>
+        <location filename="../TSHTournamentDataProvider.py" line="254"/>
         <source>Set player</source>
         <translation>Definir jogador</translation>
     </message>
@@ -1898,7 +1913,7 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../TSHTournamentInfoWidget.py" line="147"/>
         <location filename="../TSHTournamentInfoWidget.py" line="148"/>
-        <location filename="../TSHTournamentDataProvider.py" line="93"/>
+        <location filename="../TSHTournamentDataProvider.py" line="94"/>
         <source>Error</source>
         <translation>Erro</translation>
     </message>
