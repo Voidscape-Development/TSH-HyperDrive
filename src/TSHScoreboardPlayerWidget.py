@@ -764,19 +764,14 @@ class TSHScoreboardPlayerWidget(QGroupBox):
                 tag = data.get(
                     "prefix")+" "+data.get("gamerTag") if data.get("prefix") else data.get("gamerTag")
 
-                for i in range(TSHPlayerDB.model.rowCount()):
-                    item = TSHPlayerDB.model.item(
-                        i).data(Qt.ItemDataRole.UserRole)
-
-                    dbTag = item.get(
-                        "prefix")+" "+item.get("gamerTag") if item.get("prefix") else item.get("gamerTag")
-
-                    if tag == dbTag:
-                        self.SetData(item, dontLoadFromDB=True,
-                                     clear=False, no_mains=no_mains)
-                        if SettingsManager.Get("general.disable_overwrite", False):
-                            data = data | item
-                        break
+                # Looked up by tag instead of converting every row of the
+                # model back to a dict, which took tens of ms with a big DB
+                item = TSHPlayerDB.GetPlayer(tag)
+                if item is not None:
+                    self.SetData(item, dontLoadFromDB=True,
+                                 clear=False, no_mains=no_mains)
+                    if SettingsManager.Get("general.disable_overwrite", False):
+                        data = data | item
 
             # Provider-side lazy enrichment (e.g. parry → mains from a
             # linked start.gg account). No-op for providers that don't

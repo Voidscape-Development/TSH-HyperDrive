@@ -32,8 +32,18 @@ class SocketioJson:
             return str(obj)
         return obj
 
-    def dumps(*args, **kwargs):
-        return json.dumps(*args, **kwargs, default=SocketioJson.default)
+    def dumps(obj, **kwargs):
+        # Socket.IO only asks for compact JSON, which orjson writes several
+        # times faster than json (this encodes every state update).
+        if kwargs.get("separators", (',', ':')) == (',', ':') and \
+                set(kwargs) <= {"separators"}:
+            try:
+                return orjson.dumps(
+                    obj, default=SocketioJson.default,
+                    option=orjson.OPT_NON_STR_KEYS).decode()
+            except TypeError:
+                pass
+        return json.dumps(obj, **kwargs, default=SocketioJson.default)
 
     def loads(*args, **kwargs):
         return json.loads(*args, **kwargs)
@@ -81,7 +91,13 @@ class WebServer(QThread):
 
     @app.route('/program-state')
     def program_state():
-        return WebServer.actions.program_state()
+        # Flask's JSON provider sorts the keys of the whole state; orjson
+        # encodes it many times faster.
+        return flask.Response(
+            orjson.dumps(WebServer.actions.program_state(),
+                         default=SocketioJson.default,
+                         option=orjson.OPT_NON_STR_KEYS),
+            mimetype="application/json")
 
     @socketio.on('program-state-update')
     def ws_program_state_update(message):

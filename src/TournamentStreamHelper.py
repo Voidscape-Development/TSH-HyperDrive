@@ -942,7 +942,10 @@ class Window(QMainWindow):
                     path_error,
                 )
 
-        TSHCountryHelper.LoadCountries()
+        # Already loaded by UpdateCountriesFile() unless that failed; loading
+        # the countries file again took seconds
+        if TSHCountryHelper.countryModel is None:
+            TSHCountryHelper.LoadCountries()
         self.settingsWindow.UiMounted()
         # self.layoutOptions.UiMounted()
         TSHTournamentDataProvider.instance.UiMounted()

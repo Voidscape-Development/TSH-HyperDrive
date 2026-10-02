@@ -33,6 +33,8 @@ class TSHTournamentDataProviderSignals(QObject):
 
 class TSHTournamentDataProvider(QObject):
     instance: "TSHTournamentDataProvider" = None
+    # Seconds; less than the 5s auto update interval
+    STREAM_QUEUE_MIN_INTERVAL = 2.5
 
     def __init__(self) -> None:
         super().__init__(None)
@@ -48,6 +50,7 @@ class TSHTournamentDataProvider(QObject):
             self.SetGameFromProvider)
 
         self.setLoadingWorker = None
+        self.lastStreamQueueRequest = (None, 0)
 
     def GameChanged(self, videogame):
         StateManager.Set(f"provider_videogame", {
@@ -435,6 +438,17 @@ class TSHTournamentDataProvider(QObject):
         self.threadPool.start(worker)
 
     def GetStreamQueue(self):
+        # Every scoreboard on auto update asks for the stream queue every 5s,
+        # twice per update in stream/station mode. It's the same for the whole
+        # tournament and everyone gets it through stream_queue_loaded, so
+        # requests made shortly after another one share its result.
+        now = time.monotonic()
+        lastProvider, lastTime = self.lastStreamQueueRequest
+        if lastProvider is self.provider and \
+                now - lastTime < self.STREAM_QUEUE_MIN_INTERVAL:
+            return
+        self.lastStreamQueueRequest = (self.provider, now)
+
         worker = Worker(self.provider.GetStreamQueue)
         worker.signals.result.connect(lambda streamQueue: [
             TSHTournamentDataProvider.instance.signals.stream_queue_loaded.emit(
