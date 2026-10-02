@@ -241,6 +241,11 @@ class TSHBracketWidget(QDockWidget):
 
         self.phaseGroupSelection.clear()
 
+        supportedTypes = ["DOUBLE_ELIMINATION"]
+        provider = TSHTournamentDataProvider.instance.provider
+        if getattr(provider, "SUPPORTS_BRACKET_GRAPH", False):
+            supportedTypes.append("SINGLE_ELIMINATION")
+
         if self.phaseSelection.currentData() != None:
             logger.info(
                 str(self.phaseSelection.currentData().get("groups", [])))
@@ -248,8 +253,8 @@ class TSHBracketWidget(QDockWidget):
                 self.phaseGroupSelection.addItem(
                     phaseGroup.get("name"), phaseGroup)
 
-                # Let's only allow double elimination for now
-                if phaseGroup.get("bracketType") != "DOUBLE_ELIMINATION":
+                # Other bracket types need the provider's real bracket graph
+                if phaseGroup.get("bracketType") not in supportedTypes:
                     itemModel: QStandardItemModel = self.phaseGroupSelection.model()
                     item = itemModel.item(itemModel.rowCount()-1)
                     item.setEnabled(False)
@@ -341,6 +346,15 @@ class TSHBracketWidget(QDockWidget):
                     "Phase group fetch looks partial (no entrants but sets present); skipping bracket rebuild")
                 return
 
+            # The provider's real sets and how they connect, when it has them
+            graphBracket = None
+            if phaseGroupData.get("graph"):
+                try:
+                    graphBracket = Bracket.FromGraph(
+                        phaseGroupData.get("graph"), len(entrants))
+                except Exception:
+                    logger.error(traceback.format_exc())
+
             # Each of these controls rebuilds the whole bracket when changed.
             # The bracket is rebuilt once below, so don't let them do it too.
             controls = [self.progressionsIn,
@@ -352,8 +366,12 @@ class TSHBracketWidget(QDockWidget):
                     len(phaseGroupData.get("progressionsIn") or []))
                 self.progressionsOut.setValue(
                     len(phaseGroupData.get("progressionsOut") or []))
-                self.winnersOnly.setChecked(
-                    bool(phaseGroupData.get("winnersOnlyProgressions", False)))
+                if graphBracket is not None:
+                    winnersOnly = graphBracket.winnersOnlyProgressions
+                else:
+                    winnersOnly = bool(phaseGroupData.get(
+                        "winnersOnlyProgressions", False))
+                self.winnersOnly.setChecked(winnersOnly)
             finally:
                 for control in controls:
                     control.blockSignals(False)
@@ -376,11 +394,21 @@ class TSHBracketWidget(QDockWidget):
             self.playerPerTeam.setValue(self.playerList.playersPerTeam)
             self.playerPerTeam.blockSignals(False)
 
-            self.RebuildBracket(
-                len(entrants),
-                phaseGroupData.get("seedMap"),
-                phaseGroupData.get("customSeeding", False)
-            )
+            if graphBracket is not None:
+                self.bracket = graphBracket
+                self.bracketView.SetBracket(
+                    self.bracket,
+                    progressionsIn=self.progressionsIn.value(),
+                    progressionsOut=self.progressionsOut.value(),
+                    winnersOnlyProgressions=self.winnersOnly.isChecked()
+                )
+                sets = {}
+            else:
+                self.RebuildBracket(
+                    len(entrants),
+                    phaseGroupData.get("seedMap"),
+                    phaseGroupData.get("customSeeding", False)
+                )
 
             for r, round in sets.items():
                 for s, _set in enumerate(round):

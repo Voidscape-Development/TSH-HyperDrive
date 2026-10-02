@@ -18,7 +18,7 @@ from ..TSHPlayerDB import TSHPlayerDB
 from .TournamentDataProvider import TournamentDataProvider
 import orjson
 from ..Helpers.TSHLocaleHelper import TSHLocaleHelper
-from ..TSHBracket import is_power_of_two
+from ..TSHBracket import Bracket, is_power_of_two
 
 from ..Workers import Worker
 
@@ -40,6 +40,10 @@ _sessionMethods = {requests.get: "GET", requests.post: "POST"}
 
 
 class StartGGDataProvider(TournamentDataProvider):
+    # GetTournamentPhaseGroup returns the real set graph ("graph"), so the
+    # bracket widget can show any elimination bracket exactly like start.gg
+    SUPPORTS_BRACKET_GRAPH = True
+
     CompletedSetsQuery = None
     EntrantsQuery = None
     # request for a single set with only info relevant for a set that is yet to be played
@@ -362,17 +366,16 @@ class StartGGDataProvider(TournamentDataProvider):
         finalData = {}
 
         try:
-            # Seeds, sets, and the legacy REST payload are independent of
-            # each other, so fetch them concurrently rather than one after
-            # another. This runs on a worker of the shared thread pool, so
-            # use a separate executor: waiting on jobs queued behind us in
-            # the same pool could leave them stuck waiting for a free thread.
-            with ThreadPoolExecutor(max_workers=3) as executor:
+            # Seeds and sets are independent of each other, so fetch them
+            # concurrently rather than one after another. This runs on a
+            # worker of the shared thread pool, so use a separate executor:
+            # waiting on jobs queued behind us in the same pool could leave
+            # them stuck waiting for a free thread.
+            with ThreadPoolExecutor(max_workers=2) as executor:
                 fetchSeeds = executor.submit(
                     self._FetchPhaseGroupSeeds, id, cancel_event=cancel_event)
                 fetchSets = executor.submit(
                     self._FetchPhaseGroupSets, id, cancel_event=cancel_event)
-                fetchOld = executor.submit(self._FetchOldPhaseGroupData, id)
 
                 def result(future):
                     try:
@@ -383,7 +386,6 @@ class StartGGDataProvider(TournamentDataProvider):
 
                 seedsResult = result(fetchSeeds)
                 setsResult = result(fetchSets)
-                oldData = result(fetchOld)
 
             seeds = (seedsResult or {}).get("seeds", [])
             seedMap = (seedsResult or {}).get("seedMap")
@@ -415,6 +417,18 @@ class StartGGDataProvider(TournamentDataProvider):
                 teams.append(team)
 
             finalData["entrants"] = teams
+
+            graph = self._BuildBracketGraph(seeds, sets)
+            if graph is not None:
+                finalData["graph"] = graph
+                oldData = {}
+            else:
+                # Only the old bracket logic needs this, and it's slow
+                try:
+                    oldData = self._FetchOldPhaseGroupData(id) or {}
+                except Exception:
+                    logger.error(traceback.format_exc())
+                    oldData = {}
 
             # Preview IDs cannot be sorted normally
             # They follow the format: preview_2004442_1_5
@@ -499,6 +513,69 @@ class StartGGDataProvider(TournamentDataProvider):
             logger.error(traceback.format_exc())
 
         return finalData
+
+    @staticmethod
+    def _BuildBracketGraph(seeds, sets):
+        # The phase group's sets and how they connect (Bracket.FromGraph), so
+        # the bracket is drawn exactly as start.gg has it instead of being
+        # rebuilt from the number of entrants. Returns None if it can't be
+        # used, in which case the old bracket logic is used.
+        try:
+            # Entrant index (1-based, by seed) the bracket's player ids use
+            seedIndex = {}
+            entrantIndex = {}
+            for i, seed in enumerate(seeds):
+                if seed.get("id") is not None:
+                    seedIndex[str(seed.get("id"))] = i + 1
+                entrantId = deep_get(seed, "entrant.id")
+                if entrantId is not None:
+                    entrantIndex[str(entrantId)] = i + 1
+
+            graphSets = []
+            for s in sets:
+                slots = []
+                winnerSlot = None
+
+                for slotIndex, slot in enumerate(s.get("slots") or []):
+                    seedId = deep_get(slot, "seed.id")
+                    entrantId = deep_get(slot, "entrant.id")
+
+                    player = seedIndex.get(str(seedId)) if seedId is not None else None
+                    if player is None and entrantId is not None:
+                        player = entrantIndex.get(str(entrantId))
+
+                    if entrantId is not None and s.get("winnerId") is not None and \
+                            str(entrantId) == str(s.get("winnerId")):
+                        winnerSlot = slotIndex
+
+                    slots.append({
+                        "prereqType": slot.get("prereqType"),
+                        "prereqId": str(slot.get("prereqId")) if slot.get("prereqId") is not None else None,
+                        "placement": slot.get("prereqPlacement"),
+                        "player": player,
+                    })
+
+                graphSets.append({
+                    "id": str(s.get("id")),
+                    "round": int(s.get("round") or 0),
+                    "identifier": s.get("identifier"),
+                    "name": s.get("fullRoundText"),
+                    "score": [s.get("entrant1Score"), s.get("entrant2Score")],
+                    "finished": s.get("state", 0) == 3,
+                    "winnerSlot": winnerSlot,
+                    "slots": slots,
+                })
+
+            graph = {"sets": graphSets}
+
+            # Make sure it's usable before the UI relies on it
+            Bracket.FromGraph(graph, len(seeds))
+
+            return graph
+        except Exception:
+            logger.error("Couldn't build the bracket from start.gg's sets; using the old bracket logic")
+            logger.error(traceback.format_exc())
+            return None
 
     def GetMatch(self, setId, progress_callback=None, cancel_event=None):
         finalResult = None

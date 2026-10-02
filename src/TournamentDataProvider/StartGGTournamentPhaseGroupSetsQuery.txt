@@ -8,11 +8,21 @@ query TournamentPhaseGroupSetsQuery($id: ID!, $page: Int!, $perPage: Int!) {
 				id
 				round
 				identifier
+				fullRoundText
 				entrant1Score
 				entrant2Score
+				winnerId
 				state
 				slots {
 					prereqType
+					prereqId
+					prereqPlacement
+					seed {
+						id
+					}
+					entrant {
+						id
+					}
 				}
 			}
 		}
