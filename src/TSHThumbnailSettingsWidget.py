@@ -86,6 +86,15 @@ class TSHThumbnailSettingsWidget(QDockWidget):
         self.settings = uic.loadUi(TSHResolve("src/layout/TSHThumbnailSettings.ui"))
         self.widget.layout().addWidget(self.settings)
 
+        # Size the settings sidebar to fit its contents plus the vertical
+        # scrollbar, so it never needs a horizontal scrollbar
+        self.settingsScrollArea: QScrollArea = self.settings.findChild(
+            QScrollArea, "scrollArea")
+        self.settingsScrollArea.setWidgetResizable(True)
+        self.settingsScrollArea.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.settingsScrollArea.widget().installEventFilter(self)
+
         # SET DEFAULTS
         self.setDefaultsButton = self.settings.findChild(
             QPushButton, "resetToDefault")
@@ -515,6 +524,20 @@ class TSHThumbnailSettingsWidget(QDockWidget):
                 logger.error(traceback.format_exc())
 
         self.updateFromSettings()
+        self.FitSettingsWidth()
+
+    def FitSettingsWidth(self):
+        contentsWidth = self.settingsScrollArea.widget().sizeHint().width()
+        scrollBarWidth = self.settingsScrollArea.verticalScrollBar().sizeHint().width()
+        self.settingsScrollArea.setMinimumWidth(
+            contentsWidth + scrollBarWidth +
+            2 * self.settingsScrollArea.frameWidth()
+        )
+
+    def eventFilter(self, obj, event):
+        if obj is self.settingsScrollArea.widget() and event.type() == QEvent.Type.LayoutRequest:
+            self.FitSettingsWidth()
+        return super().eventFilter(obj, event)
 
     def GetSetting(self, key, default=0):
         setting = SettingsManager.Get(

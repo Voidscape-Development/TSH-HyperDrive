@@ -14,6 +14,7 @@ from .TSHBracketView import TSHBracketView
 from .TSHPlayerList import TSHPlayerList
 from .TSHBracket import *
 from .TSHHotkeys import TSHHotkeys
+from .SettingsManager import SettingsManager
 import traceback
 from loguru import logger
 
@@ -218,11 +219,39 @@ class TSHBracketWidget(QDockWidget):
         self.splitter = self.findChild(QSplitter, "splitter")
         self.splitter.setSizes([1, 1])
 
+        # Lets the player list be tucked away so the bracket gets the space
+        self.playerListPanel: QScrollArea = self.findChild(
+            QScrollArea, "scrollArea")
+        self.btTogglePlayerList = QPushButton()
+        self.btTogglePlayerList.setCheckable(True)
+        self.btTogglePlayerList.setIcon(QIcon("./assets/icons/people.svg"))
+        self.btTogglePlayerList.setSizePolicy(
+            QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.btTogglePlayerList.toggled.connect(self.SetPlayerListHidden)
+        contentsLayout: QVBoxLayout = self.findChild(
+            QWidget, "dockWidgetContents").layout()
+        contentsLayout.insertWidget(
+            contentsLayout.indexOf(self.splitter), self.btTogglePlayerList)
+        self.btTogglePlayerList.setChecked(
+            SettingsManager.Get("bracket_player_list_hidden", False))
+        self.SetPlayerListHidden(self.btTogglePlayerList.isChecked())
+
         self.bracketView.Update()
 
         TSHGameAssetManager.instance.signals.onLoad.connect(
             self.SetDefaultsFromAssets
         )
+
+    def SetPlayerListHidden(self, hidden):
+        self.playerListPanel.setHidden(hidden)
+        if hidden:
+            self.btTogglePlayerList.setText(
+                QApplication.translate("app", "Show player list"))
+        else:
+            self.btTogglePlayerList.setText(
+                QApplication.translate("app", "Hide player list"))
+        if SettingsManager.Get("bracket_player_list_hidden", False) != hidden:
+            SettingsManager.Set("bracket_player_list_hidden", hidden)
 
     def UpdatePhases(self, phases):
         logger.info("Phases: " + str(phases))
