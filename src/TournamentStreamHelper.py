@@ -1064,6 +1064,7 @@ class Window(QMainWindow):
 
     def closeEvent(self, event):
         logger.info("Shutting down...")
+        StateManager.FlushPendingSave()
         self.qtSettings.setValue("geometry", self.saveGeometry())
         self.qtSettings.setValue("windowState", self.saveState())
 

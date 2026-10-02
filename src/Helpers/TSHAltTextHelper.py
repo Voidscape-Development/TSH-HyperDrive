@@ -5,6 +5,7 @@ from qtpy.QtGui import *
 from qtpy.QtWidgets import *
 from qtpy.QtCore import *
 from atproto import client_utils
+from ..StateManager import StateManager
 
 def add_alt_text_tooltip_to_button(push_button: QPushButton):
     altTextTooltip = QApplication.translate(
@@ -14,6 +15,8 @@ def add_alt_text_tooltip_to_button(push_button: QPushButton):
 
 
 def load_program_state():
+    # Make sure program_state.json has the latest changes
+    StateManager.FlushPendingSave()
     data_path = "./out/program_state.json"
     with open(data_path, "rt", encoding="utf-8") as data_file:
         data_json = json.loads(data_file.read())

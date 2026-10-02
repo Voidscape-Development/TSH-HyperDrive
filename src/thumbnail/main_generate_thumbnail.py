@@ -21,6 +21,7 @@ from src.Helpers.TSHLocaleHelper import TSHLocaleHelper
 from src.Helpers.TSHDictHelper import *
 from src.Helpers.TSHAltTextHelper import generate_youtube
 from src.Helpers.TSHDirHelper import TSHResolve
+from src.StateManager import StateManager
 
 is_preview = False
 
@@ -1288,6 +1289,8 @@ def generate(settingsManager, isPreview=False, gameAssetManager=None, scoreboard
     global is_preview
     is_preview = isPreview
 
+    # Make sure program_state.json has the latest changes
+    StateManager.FlushPendingSave()
     data_path = "./out/program_state.json"
     out_path = "./out/thumbnails" if not isPreview else TSHResolve("tmp/thumbnail")
     tmp_path = TSHResolve("tmp")

@@ -5,9 +5,8 @@ import orjson
 import traceback
 
 from deepdiff.helper import DELTA_VIEW
-from qtpy.QtCore import QObject, Signal
+from qtpy.QtCore import QObject, Signal, Slot, QTimer, QCoreApplication, QThread
 from deepdiff import DeepDiff, Delta, extract
-from functools import partial
 import shutil
 import threading
 import requests
@@ -21,18 +20,50 @@ class StateManagerSignals(QObject):
     state_big_change = Signal()
     state_updated = Signal(dict)
 
+
+class StateManagerSaveScheduler(QObject):
+    """Coalesces the saves requested by Set()/Unset() into one save.
+
+    Lives on the GUI thread; request can be emitted from any thread.
+    """
+    request = Signal()
+
+    def __init__(self):
+        super().__init__()
+        self.timer = QTimer(self)
+        self.timer.setSingleShot(True)
+        self.timer.setInterval(StateManager.SAVE_DEBOUNCE_MS)
+        self.timer.timeout.connect(StateManager.FlushPendingSave)
+        self.request.connect(self.Start)
+
+    @Slot()
+    def Start(self):
+        # Not restarted while active, so a stream of changes can't postpone
+        # the save indefinitely.
+        if not self.timer.isActive():
+            self.timer.start()
+
+
 class StateManager:
     lastSavedState = {}
     state = {}
     saveBlocked = 0
     signals = StateManagerSignals()
     changedKeys = []
+    # Same changes as changedKeys, as tuples of keys, used to update
+    # lastSavedState without cloning the whole state
+    changedPaths = []
     deltaIndex = 0
     load_error: "str | None" = None
 
     lock = threading.RLock()
-    threads = []
     loop = None
+
+    # Set()/Unset() don't save right away: changes made within this window are
+    # exported together in a single save.
+    SAVE_DEBOUNCE_MS = 40
+    savePending = False
+    saveScheduler: "StateManagerSaveScheduler | None" = None
 
     # Timestamp of the last 0 -> 1 transition of saveBlocked, used by the
     # watchdog to detect a BlockSaving() that never got its ReleaseSaving().
@@ -128,6 +159,7 @@ class StateManager:
             return
 
         with StateManager.lock:
+            StateManager.savePending = False
             try:
                 StateManager.DoSaveState()
             except Exception as e:
@@ -136,9 +168,33 @@ class StateManager:
                 # ReleaseSaving() and disable every future export.
                 logger.error(traceback.format_exc())
 
-    def DoSaveState():
-        StateManager.threads = []
+    def RequestSave():
+        """Schedule a save shortly, merging it with any other changes made until then."""
+        with StateManager.lock:
+            StateManager.savePending = True
 
+            if StateManager.saveScheduler is None:
+                app = QCoreApplication.instance()
+                if app is None:
+                    # No event loop to run the timer on, save right away
+                    StateManager.SaveState()
+                    return
+                scheduler = StateManagerSaveScheduler()
+                scheduler.moveToThread(app.thread())
+                StateManager.saveScheduler = scheduler
+
+            if QThread.currentThread() == StateManager.saveScheduler.thread():
+                StateManager.saveScheduler.Start()
+            else:
+                StateManager.saveScheduler.request.emit()
+
+    def FlushPendingSave():
+        """Save now if there are changes waiting for a scheduled save."""
+        with StateManager.lock:
+            if StateManager.savePending:
+                StateManager.SaveState()
+
+    def DoSaveState():
         def EncodeFallback(value):
             # Without this a single value orjson can't handle would stop
             # program_state.json from ever being written again.
@@ -147,13 +203,13 @@ class StateManager:
                 "serializable; exporting it as text")
             return str(value)
 
-        def ExportAll(ref_diff):
+        def ExportAll(ref_diff, changedPaths):
             try:
                 StateManager.state.update({"timestamp": time.time()})
                 try:
                     encoded = orjson.dumps(
                         StateManager.state, default=EncodeFallback,
-                        option=orjson.OPT_NON_STR_KEYS | orjson.OPT_INDENT_2)
+                        option=orjson.OPT_NON_STR_KEYS)
 
                     # Write to a temp file then atomically replace, so a concurrent
                     # reader never sees a truncated file. On Windows the replace can
@@ -174,20 +230,19 @@ class StateManager:
                 if not SettingsManager.Get("general.disable_export", False):
                     StateManager.ExportText(
                         StateManager.lastSavedState, ref_diff)
-                StateManager.lastSavedState = deep_clone(
-                    StateManager.state)
+                StateManager.UpdateLastSavedState(changedPaths)
             except Exception as e:
-                # This runs in its own thread; without this the traceback would
-                # only reach the thread excepthook.
                 logger.error(traceback.format_exc())
 
         # logger.debug(StateManager.changedKeys)
 
         changedKeys = list(set(StateManager.changedKeys))
+        changedPaths = StateManager.changedPaths
 
         # Cleared up front: a change we cannot diff must not be retried on every
         # subsequent save, or a single bad key would stall the export for good.
         StateManager.changedKeys = []
+        StateManager.changedPaths = []
 
         try:
             diff = DeepDiff(
@@ -225,19 +280,60 @@ class StateManager:
         # When the diff couldn't be computed we still export, so that
         # program_state.json keeps tracking the live state.
         if diff is None or len(diff) > 0:
-            exportThread = threading.Thread(
-                target=partial(ExportAll, ref_diff=diff if diff is not None else {}))
-            StateManager.threads.append(exportThread)
-            exportThread.start()
+            # Without a diff (or without changed keys, which makes DeepDiff
+            # compare everything) we can't tell what changed, so resync
+            # lastSavedState completely.
+            ExportAll(
+                diff if diff is not None else {},
+                changedPaths if diff is not None and changedKeys else None)
 
-            for t in StateManager.threads:
-                t.join()
+    def UpdateLastSavedState(changedPaths):
+        """Copy the changed paths of the state into lastSavedState.
+
+        Much cheaper than cloning the whole state on every save. With
+        changedPaths=None the whole state is cloned.
+        """
+        if changedPaths is not None:
+            try:
+                # Parents first, so a child copied later isn't overwritten
+                for path in sorted(set(changedPaths), key=len):
+                    src = StateManager.state
+                    exists = True
+                    for k in path:
+                        if isinstance(src, dict) and k in src:
+                            src = src[k]
+                        else:
+                            exists = False
+                            break
+
+                    dst = StateManager.lastSavedState
+                    for k in path[:-1]:
+                        if k not in dst:
+                            if not exists:
+                                break
+                            dst[k] = {}
+                        dst = dst[k]
+                        if not isinstance(dst, dict):
+                            raise TypeError(f"Can't update lastSavedState at {path}")
+                    else:
+                        if exists:
+                            dst[path[-1]] = deep_clone(src)
+                        else:
+                            dst.pop(path[-1], None)
+                return
+            except Exception:
+                logger.warning(traceback.format_exc())
+
+        StateManager.lastSavedState = deep_clone(StateManager.state)
 
     def LoadState():
         StateManager.load_error = None
         try:
             with open("./out/program_state.json", 'rb') as file:
                 StateManager.state = orjson.loads(file.read())
+                # Only changed paths are copied to lastSavedState from now on,
+                # so it must start out matching the loaded state
+                StateManager.lastSavedState = deep_clone(StateManager.state)
                 StateManager.signals.state_big_change.emit()
         except FileNotFoundError:
             pass
@@ -263,10 +359,10 @@ class StateManager:
                 final_key += f"['{k}']"
 
             StateManager.changedKeys.append(final_key)
+            StateManager.changedPaths.append(tuple(key.split(".")))
 
             if StateManager.saveBlocked == 0:
-                StateManager.SaveState()
-                # StateManager.ExportText(oldState)
+                StateManager.RequestSave()
             else:
                 StateManager.CheckSaveBlockWatchdog()
 
@@ -284,10 +380,10 @@ class StateManager:
             for k in key.split("."):
                 final_key += f"['{k}']"
             StateManager.changedKeys.append(final_key)
+            StateManager.changedPaths.append(tuple(key.split(".")))
 
             if StateManager.saveBlocked == 0:
-                StateManager.SaveState()
-                # StateManager.ExportText(oldState)
+                StateManager.RequestSave()
             else:
                 StateManager.CheckSaveBlockWatchdog()
 
@@ -348,9 +444,6 @@ class StateManager:
                 # Remove "root[" from start and separate keys
                 path = "/".join(key[5:].replace(
                     "'", "").replace("]", "").replace("/", "_").split("["))
-                # Remove "root[" from start and separate keys
-                path = "/".join(key[5:].replace(
-                    "'", "").replace("]", "").replace("/", "_").split("["))
 
                 # logger.info("Added:", path, item)
                 # logger.info("Added:", path, item)
@@ -401,7 +494,7 @@ class StateManager:
 
                     def downloadImage(url, dlpath):
                         try:
-                            r = requests.get(url, stream=True)
+                            r = requests.get(url, stream=True, timeout=15)
                             if r.status_code == 200:
                                 with open(dlpath, 'wb') as f:
                                     r.raw.decode_content = True
@@ -415,14 +508,16 @@ class StateManager:
                         except Exception as e:
                             logger.error(traceback.format_exc())
 
+                    # Not waited on: the save runs on the caller's thread
+                    # (usually the GUI), which must not hang on the network.
                     t = threading.Thread(
                         target=downloadImage,
                         args=[
                             di,
                             f"./out/{path}" + "." + di.rsplit(".", 1)[-1]
-                        ]
+                        ],
+                        daemon=True
                     )
-                    StateManager.threads.append(t)
                     t.start()
                 except Exception as e:
                     logger.error(traceback.format_exc())
