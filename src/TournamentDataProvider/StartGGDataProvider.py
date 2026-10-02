@@ -75,12 +75,15 @@ class StartGGDataProvider(TournamentDataProvider):
         self._mainsQueueLock = threading.Lock()
         self._mainsQueueThread = None
 
-    # Queries the provided URL until a proper 200 status code has been provided back
-    #
-    # This should work fine in theory unless an API restriction is added
-    def QueryRequests(self, url=None, type=None, headers=None, jsonParams=None, params=None):
+    # Status codes worth trying again: rate limiting and server-side errors.
+    # Anything else (bad query, auth, not found) fails the same way every time.
+    _retryStatusCodes = {429, 500, 502, 503, 504}
+    _maxRetryDelaySecs = 8.0
+
+    # Queries the provided URL, retrying (with backoff) while start.gg is rate
+    # limiting us or having server trouble
+    def QueryRequests(self, url=None, type=None, headers=None, jsonParams=None, params=None, retries=5, timeout=None):
         try:
-            requestCode = 0
             data = None
             headers = dict(headers or {})
             headers.update({
@@ -88,20 +91,44 @@ class StartGGDataProvider(TournamentDataProvider):
                 "Content-Type": "application/json",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
             })
-            retries = 0
             method = _sessionMethods.get(type)
             send = (lambda url, **kwargs: _session.request(method, url, **kwargs)) \
                 if method else type
-            while requestCode != 200 and retries < 10:
-                data = send(
-                    url,
-                    timeout=self._request_timeout_secs,
-                    headers=headers,
-                    json=jsonParams,
-                    params=params
-                )
-                requestCode = data.status_code
-                retries += 1
+            for attempt in range(retries + 1):
+                lastAttempt = attempt == retries
+                try:
+                    data = send(
+                        url,
+                        timeout=timeout or self._request_timeout_secs,
+                        headers=headers,
+                        json=jsonParams,
+                        params=params
+                    )
+                except requests.exceptions.ConnectionError as e:
+                    # Dropped/refused connections are usually transient.
+                    # Timeouts aren't retried: each one already waited a while.
+                    if lastAttempt or isinstance(e, requests.exceptions.Timeout):
+                        raise
+                    time.sleep(min(0.5 * 2 ** attempt, self._maxRetryDelaySecs))
+                    continue
+
+                if data.status_code == 200 or data.status_code not in self._retryStatusCodes or lastAttempt:
+                    break
+
+                delay = min(0.5 * 2 ** attempt, self._maxRetryDelaySecs)
+                retryAfter = data.headers.get("Retry-After")
+                if retryAfter:
+                    try:
+                        delay = min(float(retryAfter), self._maxRetryDelaySecs * 2)
+                    except ValueError:
+                        pass
+                logger.warning(
+                    f"start.gg {(jsonParams or {}).get('operationName', url)} returned {data.status_code}, retrying in {delay}s")
+                time.sleep(delay)
+
+            if data.status_code != 200:
+                logger.warning(
+                    f"start.gg {(jsonParams or {}).get('operationName', url)} returned {data.status_code}")
             data = orjson.loads(data.text)
             # GraphQL errors (e.g. the complexity cap) come back as a 200,
             # so they'd otherwise look like an empty result
@@ -231,14 +258,22 @@ class StartGGDataProvider(TournamentDataProvider):
 
         return phases
 
-    def _FetchPhaseGroupSeeds(self, id, progress_callback=None, cancel_event=None):
-        seeds = []
-        seedMap = None
-        progressionsOut = None
-        page = 1
-        totalPages = 1
+    def _FetchAllPages(self, fetchPage, totalPagesPath, cancel_event=None):
+        # Page 1 tells us how many pages there are; the rest are fetched in
+        # parallel instead of one after another. Results stay in page order.
+        first = fetchPage(1)
+        pages = [first]
+        totalPages = deep_get(first, totalPagesPath, 1) or 1
 
-        while page <= totalPages and (cancel_event is None or not cancel_event.is_set()):
+        if totalPages > 1 and (cancel_event is None or not cancel_event.is_set()):
+            # Keep the worker count low so start.gg doesn't start rate limiting us
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                pages.extend(executor.map(fetchPage, range(2, totalPages + 1)))
+
+        return pages
+
+    def _FetchPhaseGroupSeeds(self, id, progress_callback=None, cancel_event=None):
+        def fetchPage(page):
             seedsData = self.QueryRequests(
                 "https://www.start.gg/api/-/gql",
                 type=requests.post,
@@ -261,26 +296,24 @@ class StartGGDataProvider(TournamentDataProvider):
                 logger.warning(
                     f"TournamentPhaseGroupSeedsQuery returned no phaseGroup for id {id} (page {page}): {seedsData}")
 
-            if page == 1:
-                seedMap = deep_get(seedsData, "data.phaseGroup.seedMap.1")
-                progressionsOut = deep_get(
-                    seedsData, "data.phaseGroup.progressionsOut")
+            return seedsData
 
+        pages = self._FetchAllPages(
+            fetchPage, "data.phaseGroup.seeds.pageInfo.totalPages", cancel_event)
+
+        seeds = []
+        for seedsData in pages:
             seeds.extend(
-                deep_get(seedsData, "data.phaseGroup.seeds.nodes", []))
+                deep_get(seedsData, "data.phaseGroup.seeds.nodes", []) or [])
 
-            totalPages = deep_get(
-                seedsData, "data.phaseGroup.seeds.pageInfo.totalPages", 1)
-            page += 1
-
-        return {"seeds": seeds, "seedMap": seedMap, "progressionsOut": progressionsOut}
+        return {
+            "seeds": seeds,
+            "seedMap": deep_get(pages[0], "data.phaseGroup.seedMap.1"),
+            "progressionsOut": deep_get(pages[0], "data.phaseGroup.progressionsOut")
+        }
 
     def _FetchPhaseGroupSets(self, id, progress_callback=None, cancel_event=None):
-        sets = []
-        page = 1
-        totalPages = 1
-
-        while page <= totalPages and (cancel_event is None or not cancel_event.is_set()):
+        def fetchPage(page):
             setsData = self.QueryRequests(
                 "https://www.start.gg/api/-/gql",
                 type=requests.post,
@@ -289,7 +322,7 @@ class StartGGDataProvider(TournamentDataProvider):
                     "variables": {
                         "id": id,
                         "page": page,
-                        "perPage": 200
+                        "perPage": 100
                     },
                     "query": StartGGDataProvider.TournamentPhaseGroupSetsQuery
                 }
@@ -303,19 +336,26 @@ class StartGGDataProvider(TournamentDataProvider):
                 logger.warning(
                     f"TournamentPhaseGroupSetsQuery returned no phaseGroup for id {id} (page {page}): {setsData}")
 
-            sets.extend(
-                deep_get(setsData, "data.phaseGroup.sets.nodes", []))
+            return setsData
 
-            totalPages = deep_get(
-                setsData, "data.phaseGroup.sets.pageInfo.totalPages", 1)
-            page += 1
+        pages = self._FetchAllPages(
+            fetchPage, "data.phaseGroup.sets.pageInfo.totalPages", cancel_event)
+
+        sets = []
+        for setsData in pages:
+            sets.extend(
+                deep_get(setsData, "data.phaseGroup.sets.nodes", []) or [])
 
         return {"sets": sets}
 
     def _FetchOldPhaseGroupData(self, id, progress_callback=None, cancel_event=None):
+        # Legacy REST API, only used for "hasCustomWinnerByes". It's slow and
+        # not always up, so don't let it hold the whole bracket load hostage.
         return self.QueryRequests(
             f"https://api.smash.gg/phase_group/{id}",
-            type=requests.get
+            type=requests.get,
+            retries=0,
+            timeout=5
         )
 
     def GetTournamentPhaseGroup(self, id, progress_callback=None, cancel_event=None):
@@ -324,25 +364,26 @@ class StartGGDataProvider(TournamentDataProvider):
         try:
             # Seeds, sets, and the legacy REST payload are independent of
             # each other, so fetch them concurrently rather than one after
-            # another. Splitting the seeds/sets queries apart (to stay under
-            # StartGG's 1000-object GraphQL complexity cap) turned one
-            # request into several, and running them sequentially made the
-            # whole fetch noticeably slower than the old single-request
-            # version.
-            fetchSeeds = Worker(self._FetchPhaseGroupSeeds, **{"id": id})
-            fetchSets = Worker(self._FetchPhaseGroupSets, **{"id": id})
-            fetchOld = Worker(self._FetchOldPhaseGroupData, **{"id": id})
+            # another. This runs on a worker of the shared thread pool, so
+            # use a separate executor: waiting on jobs queued behind us in
+            # the same pool could leave them stuck waiting for a free thread.
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                fetchSeeds = executor.submit(
+                    self._FetchPhaseGroupSeeds, id, cancel_event=cancel_event)
+                fetchSets = executor.submit(
+                    self._FetchPhaseGroupSets, id, cancel_event=cancel_event)
+                fetchOld = executor.submit(self._FetchOldPhaseGroupData, id)
 
-            self.threadpool.start(fetchSeeds)
-            self.threadpool.start(fetchSets)
-            self.threadpool.start(fetchOld)
+                def result(future):
+                    try:
+                        return future.result()
+                    except Exception:
+                        logger.error(traceback.format_exc())
+                        return {}
 
-            Worker.wait_for_all(
-                [fetchSeeds, fetchSets, fetchOld], self._request_timeout_secs * 20)
-
-            seedsResult = fetchSeeds.result if fetchSeeds.completed else {}
-            setsResult = fetchSets.result if fetchSets.completed else {}
-            oldData = fetchOld.result if fetchOld.completed else {}
+                seedsResult = result(fetchSeeds)
+                setsResult = result(fetchSets)
+                oldData = result(fetchOld)
 
             seeds = (seedsResult or {}).get("seeds", [])
             seedMap = (seedsResult or {}).get("seedMap")
