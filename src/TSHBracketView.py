@@ -68,13 +68,6 @@ class BracketSetWidget(QWidget):
         self.sizePolicy().setRetainSizeWhenHidden(True)
         self.layout().setSpacing(2)
 
-        if self.bracketSet is not None and self.bracketSet.bracket.isGraph:
-            # Like start.gg, bye sets aren't shown but keep their spot so
-            # the rest of the round stays lined up with the sets it leads to
-            policy = self.sizePolicy()
-            policy.setRetainSizeWhenHidden(True)
-            self.setSizePolicy(policy)
-
         self.UpdateVisibility()
 
     def UpdateVisibility(self):
@@ -329,6 +322,8 @@ class TSHBracketView(QGraphicsView):
         self.losersBracketWidgets = []
 
         self.roundNameLabels = {}
+        # Round column and its set widgets, to hide rounds with only byes
+        self.roundColumns = []
 
         self.bracket.UpdateBracket()
 
@@ -379,8 +374,21 @@ class TSHBracketView(QGraphicsView):
                 roundWidgets.append(wid)
             self.bracketWidgets.append(roundWidgets)
             currentWidgets.append(roundWidgets)
+            self.roundColumns.append((layoutOuter, roundWidgets))
+
+        self.UpdateRoundVisibility()
 
         self.ScheduleRedraw(fit=True)
+
+    def UpdateRoundVisibility(self):
+        # Like start.gg, don't show a round made only of byes. Bye sets are
+        # derived from the bracket's structure, not from scores, so this only
+        # changes when the bracket is rebuilt, but it's cheap to check.
+        if not self.bracket.isGraph:
+            return
+        for column, roundWidgets in self.roundColumns:
+            column.setVisible(
+                any(not w.isHidden() for w in roundWidgets))
 
     def ScheduleRedraw(self, fit=False):
         self._fitPending = self._fitPending or fit
@@ -450,6 +458,8 @@ class TSHBracketView(QGraphicsView):
                 setWidget.Update(offsets)
                 for w in setWidget.score:
                     w.blockSignals(False)
+
+        self.UpdateRoundVisibility()
 
         self.ScheduleRedraw()
 

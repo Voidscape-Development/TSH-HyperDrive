@@ -317,6 +317,12 @@ class StartGGDataProvider(TournamentDataProvider):
         }
 
     def _FetchPhaseGroupSets(self, id, progress_callback=None, cancel_event=None):
+        # Sorted by round and identifier, which doesn't change between page
+        # requests. CALL_ORDER does (sets get called, ties have no fixed
+        # order), so a set could move from one page to another while the
+        # pages were fetched and be missed entirely.
+        sortType = "ROUND"
+
         def fetchPage(page):
             setsData = self.QueryRequests(
                 "https://www.start.gg/api/-/gql",
@@ -326,7 +332,8 @@ class StartGGDataProvider(TournamentDataProvider):
                     "variables": {
                         "id": id,
                         "page": page,
-                        "perPage": 100
+                        "perPage": 100,
+                        "sortType": sortType
                     },
                     "query": StartGGDataProvider.TournamentPhaseGroupSetsQuery
                 }
@@ -342,15 +349,50 @@ class StartGGDataProvider(TournamentDataProvider):
 
             return setsData
 
-        pages = self._FetchAllPages(
-            fetchPage, "data.phaseGroup.sets.pageInfo.totalPages", cancel_event)
+        def fetchAll():
+            pages = self._FetchAllPages(
+                fetchPage, "data.phaseGroup.sets.pageInfo.totalPages", cancel_event)
+            total = deep_get(pages[0], "data.phaseGroup.sets.pageInfo.total")
+            nodes = []
+            for setsData in pages:
+                nodes.extend(
+                    deep_get(setsData, "data.phaseGroup.sets.nodes", []) or [])
+            return pages[0], total, nodes
 
-        sets = []
-        for setsData in pages:
-            sets.extend(
-                deep_get(setsData, "data.phaseGroup.sets.nodes", []) or [])
+        first, total, nodes = fetchAll()
 
-        return {"sets": sets}
+        if deep_get(first, "data.phaseGroup") is None and first.get("errors"):
+            logger.warning(
+                f"Retrying TournamentPhaseGroupSetsQuery sorted by CALL_ORDER instead of {sortType}")
+            sortType = "CALL_ORDER"
+            first, total, nodes = fetchAll()
+
+        sets = {}
+
+        def merge(nodes):
+            for s in nodes:
+                if s and s.get("id") is not None:
+                    sets.setdefault(str(s.get("id")), s)
+
+        merge(nodes)
+
+        # A set missing from the pages leaves a hole in the bracket, so fetch
+        # again until we have every set start.gg says the group has
+        for _ in range(2):
+            if total is None or len(sets) >= total:
+                break
+            if cancel_event is not None and cancel_event.is_set():
+                break
+            logger.warning(
+                f"Phase group {id}: got {len(sets)} of {total} sets, fetching again")
+            _first, _total, nodes = fetchAll()
+            merge(nodes)
+
+        if total is not None and len(sets) < total:
+            logger.error(
+                f"Phase group {id}: only got {len(sets)} of {total} sets")
+
+        return {"sets": list(sets.values())}
 
     def _FetchOldPhaseGroupData(self, id, progress_callback=None, cancel_event=None):
         # Legacy REST API, only used for "hasCustomWinnerByes". It's slow and
@@ -538,6 +580,9 @@ class StartGGDataProvider(TournamentDataProvider):
 
                 for slotIndex, slot in enumerate(s.get("slots") or []):
                     seedId = deep_get(slot, "seed.id")
+                    if seedId is None and slot.get("prereqType") == "seed":
+                        # A seed slot's prereq is the seed itself
+                        seedId = slot.get("prereqId")
                     entrantId = deep_get(slot, "entrant.id")
 
                     player = seedIndex.get(str(seedId)) if seedId is not None else None
