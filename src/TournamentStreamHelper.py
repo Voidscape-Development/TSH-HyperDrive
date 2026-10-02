@@ -61,8 +61,10 @@ else:
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
 
-        logger.critical("Uncaught exception", exc_info=(
-            exc_type, exc_value, exc_traceback))
+        # loguru ignores logging's exc_info, so pass the exception this way
+        # or the traceback never reaches the log
+        logger.opt(exception=(exc_type, exc_value, exc_traceback)).critical(
+            "Uncaught exception")
 
     sys.excepthook = handle_exception
 
@@ -1099,7 +1101,7 @@ class Window(QMainWindow):
                 sock = socket.socket(fileno=int(web_socket_fd))
                 sock.close()
         except Exception as e:
-            logger.warning("Error closing web socket on shutdown", exc_info=True)
+            logger.opt(exception=True).warning("Error closing web socket on shutdown")
 
         self.webserver.terminate()
         self.webserver.wait(10000)  # 10 seconds grace period.
