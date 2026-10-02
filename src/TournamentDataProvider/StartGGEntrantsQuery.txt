@@ -1,11 +1,11 @@
-query EventEntrantsListQuery($eventSlug: String!, $videogameId: Int, $page: Int!) {
+query EventEntrantsListQuery($eventSlug: String!, $page: Int!) {
 	event(slug: $eventSlug) {
 		id
 		videogame {
 			id
 			name
 		}
-		entrants(query: {page: $page, perPage: 16}) {
+		entrants(query: {page: $page, perPage: 64}) {
 			pageInfo {
 				page
 				total
@@ -23,25 +23,10 @@ query EventEntrantsListQuery($eventSlug: String!, $videogameId: Int, $page: Int!
 						gamerTag
 						prefix
 						name
-						sets(page: 1, perPage: 1, filters: { hideEmpty: true, videogameId: $videogameId, videogameIds: [$videogameId] }) {
-							nodes {
-								games {
-									selections {
-										entrant {
-											participants {
-												player {
-													id
-												}
-											}
-										}
-										selectionValue
-									}
-								}
-							}
-						}
 					}
 					user {
 						id
+						slug
 						prefix
 						name
 						genderPronoun

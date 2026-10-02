@@ -44,6 +44,109 @@ scale_fill_y = 0
 
 proportional_zoom = 1
 
+DEFAULT_THUMBNAIL_TYPE = "./assets/thumbnail_base/thumbnail_types/type_a.json"
+
+# Defaults for thumbnail_config, matching what TSHThumbnailSettingsWidget
+# writes on first run, so generate() also works when that widget is
+# disabled or has never been opened (e.g. the web server endpoint).
+DEFAULT_SETTINGS = {
+    "thumbnail_type": DEFAULT_THUMBNAIL_TYPE,
+    "main_icon_path": "./layout/logo.png",
+    "display_phase": True,
+    "use_team_names": True,
+    "use_sponsors": True,
+    "player_font": {"name": "Roboto Condensed", "type": "Bold", "fontPath": "Bold"},
+    "phase_font": {"name": "Roboto Condensed", "type": "Bold", "fontPath": "Bold"},
+    "player_outline": True,
+    "phase_outline": True,
+    "player_outline_color": "#000000",
+    "phase_outline_color": "#000000",
+    "player_font_color": "#FFFFFF",
+    "phase_font_color": "#FFFFFF",
+    "sponsor_font_color_1": "#ff7a6d",
+    "sponsor_font_color_2": "#29b6f6",
+    "separator": {"color": "#000000", "width": 6},
+}
+
+DEFAULT_GAME_SETTINGS = {
+    "flip_p1": False,
+    "flip_p2": True,
+    "smooth_scale": True,
+    "align": {"horizontal": 50, "vertical": 40},
+    "zoom": 100,
+    "flipSeparators": False,
+    "proportionalScaling": True,
+    "hideSeparators": False,
+    "noSeparatorAngle": 45,
+    "noSeparatorDistance": 30,
+    "scaleFillX": False,
+    "scaleFillY": False,
+}
+
+BUNDLED_FONTS = [
+    "./assets/font/OpenSans/OpenSans-Bold.ttf",
+    "./assets/font/OpenSans/OpenSans-Semibold.ttf",
+    "./assets/font/RobotoCondensed.ttf",
+]
+_bundled_fonts_registered = False
+
+
+def register_bundled_fonts():
+    # Thumbnails pick fonts by family name, so the fonts shipped with TSH
+    # have to be registered with Qt before anything is drawn.
+    global _bundled_fonts_registered
+    if _bundled_fonts_registered:
+        return
+    for font_path in BUNDLED_FONTS:
+        if QFontDatabase.addApplicationFont(font_path) < 0:
+            logger.warning(f"Could not load bundled font {font_path}")
+    _bundled_fonts_registered = True
+
+
+def _merge_defaults(defaults, values):
+    # Copy of `defaults` overlaid with `values`; None counts as unset,
+    # same as TSHThumbnailSettingsWidget.GetSetting
+    result = {}
+    for key, val in defaults.items():
+        result[key] = _merge_defaults(val, {}) if isinstance(val, dict) else val
+    for key, val in (values or {}).items():
+        if val is None:
+            continue
+        if isinstance(val, dict) and isinstance(result.get(key), dict):
+            result[key] = _merge_defaults(result[key], val)
+        else:
+            result[key] = val
+    return result
+
+
+def default_asset_pack(game):
+    # Asset pack with the biggest images, skipping packs the thumbnail
+    # can't use (base files, stage and variant icons)
+    best_key = None
+    best_size = -1
+    for key, val in (game or {}).get("assets", {}).items():
+        if key == "base_files":
+            continue
+        if isinstance(val.get("type"), list) and ("stage_icon" in val.get("type") or "variant_icon" in val.get("type")):
+            continue
+        size = val.get("average_size")
+        area = size.get("x", 0) * size.get("y", 0) if size else 0
+        if best_key is None or area > best_size:
+            best_key = key
+            best_size = area
+    return best_key
+
+
+def _with_game_defaults(settings, game_codename, gameAssetManager=None):
+    if not game_codename:
+        return settings
+    game_defaults = dict(DEFAULT_GAME_SETTINGS)
+    manager = gameAssetManager.instance if gameAssetManager else TSHGameAssetManager.instance
+    game = (manager.games or {}).get(game_codename) if manager else None
+    if game:
+        game_defaults["asset_pack"] = default_asset_pack(game)
+    return _merge_defaults({"game": {game_codename: game_defaults}}, settings)
+
 
 def color_code_to_tuple(color_code):
     raw_color_code = color_code.lstrip("#")
@@ -1274,7 +1377,9 @@ def remove_special_chars(input_str: str):
 
 def generate(settingsManager, isPreview=False, gameAssetManager=None, scoreboardNumber=1):
     # can't import SettingsManager (ImportError: attempted relative import beyond top-level package) so.. parameter ?
-    settings = settingsManager.Get("thumbnail_config")
+    settings = _merge_defaults(
+        DEFAULT_SETTINGS, settingsManager.Get("thumbnail_config"))
+    register_bundled_fonts()
 
     global template_data
     try:
@@ -1375,6 +1480,8 @@ def generate(settingsManager, isPreview=False, gameAssetManager=None, scoreboard
                 raise Exception(QApplication.translate(
                     "thumb_app", "Player {0} tag missing").format(i))
         game_codename = data.get("game").get("codename")
+        settings = _with_game_defaults(
+            settings, game_codename, gameAssetManager)
         used_assets = deep_get(settings, f"game.{game_codename}.asset_pack")
         asset_data_path = f"./user_data/games/{game_codename}/{used_assets}/config.json"
         zoom = deep_get(settings, f"game.{game_codename}.zoom", 100)/100
@@ -1384,6 +1491,8 @@ def generate(settingsManager, isPreview=False, gameAssetManager=None, scoreboard
     except Exception as e:
         if isPreview:
             game_codename = data.get("game").get("codename")
+            settings = _with_game_defaults(
+                settings, game_codename, gameAssetManager)
             data = createFalseData(gameAssetManager, deep_get(
                 settings, f"game.{game_codename}.asset_pack"))
             used_assets = "full"
