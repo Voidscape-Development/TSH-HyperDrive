@@ -12,8 +12,33 @@ from PIL import Image
 from loguru import logger
 import glob
 import shutil
+import bisect
 
 import requests
+
+
+_REGEX_SPECIAL_CHARS = set(".^$*+?{}[]\\|()")
+
+
+def MatchFilesWithPrefix(sortedFiles, pattern, head):
+    """Return the files in sortedFiles that pattern matches (re.match).
+
+    head is the literal text every match of pattern starts with. If it has no
+    regex special characters, only the files starting with it (a contiguous
+    slice of the sorted list) are tested, instead of the whole directory.
+    """
+    if isinstance(pattern, str):
+        pattern = re.compile(pattern)
+
+    candidates = sortedFiles
+    if head and not any(ch in _REGEX_SPECIAL_CHARS for ch in head):
+        start = bisect.bisect_left(sortedFiles, head)
+        end = start
+        while end < len(sortedFiles) and sortedFiles[end].startswith(head):
+            end += 1
+        candidates = sortedFiles[start:end]
+
+    return [f for f in candidates if pattern.match(f)]
 
 
 class TSHGameAssetManagerSignals(QObject):
@@ -51,6 +76,16 @@ class TSHGameAssetManager(QObject):
         self.workers = []
 
         self.skinLoaderLock = QMutex()
+
+        # Sorted listings of asset directories, cleared when games are reloaded
+        self.assetDirCache = {}
+
+    def ListAssetDir(self, path):
+        files = self.assetDirCache.get(path)
+        if files is None:
+            files = sorted(os.listdir(path))
+            self.assetDirCache[path] = files
+        return files
 
     def UiMounted(self):
         self.DownloadStartGGCharacters()
@@ -92,6 +127,7 @@ class TSHGameAssetManager(QObject):
             def run(self):
                 with StateManager.SaveBlock():
                     self.parent().games = {}
+                    self.parent().assetDirCache = {}
 
                     gameDirs = os.listdir("./user_data/games/")
 
@@ -271,6 +307,9 @@ class TSHGameAssetManager(QObject):
 
                     logger.info("Changed to game: "+game)
 
+                    # Asset files may have changed since the last load
+                    self.parent().assetDirCache = {}
+
                     self.parent().CopyCSS(game_dir)
 
                     gameObj = self.parent().games.get(game, {})
@@ -294,17 +333,18 @@ class TSHGameAssetManager(QObject):
 
                         assetsObj = gameObj.get(
                             "assets", {}).get(assetsKey, None)
-                        files = sorted(os.listdir(
-                            './user_data/games/'+game_dir+'/'+assetsKey))
+                        files = self.parent().ListAssetDir(
+                            './user_data/games/'+game_dir+'/'+assetsKey)
 
                         self.parent().stockIcons = {}
 
                         for c in self.parent().characters.keys():
                             self.parent().stockIcons[c] = {}
 
-                            pattern = re.compile(f'({assetsObj.get("prefix", "")})({self.parent().characters[c].get("codename")})({assetsObj.get("postfix", "")})([0-9]*)\\.([A-Za-z0-9]+)')
-                            filteredFiles = \
-                                [f for f in files if pattern.match(f)]
+                            codename = self.parent().characters[c].get("codename")
+                            pattern = f'({assetsObj.get("prefix", "")})({codename})({assetsObj.get("postfix", "")})([0-9]*)\\.([A-Za-z0-9]+)'
+                            filteredFiles = MatchFilesWithPrefix(
+                                files, pattern, f'{assetsObj.get("prefix", "")}{codename}')
 
 
                             if len(filteredFiles) == 0:
@@ -336,15 +376,17 @@ class TSHGameAssetManager(QObject):
 
                         for c in self.parent().characters.keys():
                             self.parent().skins[c] = {}
+                            codename = self.parent().characters[c].get("codename")
                             for assetsKey in list(gameObj["assets"].keys()):
                                 asset = gameObj["assets"][assetsKey]
 
-                                files = sorted(os.listdir(
-                                    './user_data/games/'+game_dir+'/'+assetsKey))
+                                # Listed once per pack, not once per character
+                                files = self.parent().ListAssetDir(
+                                    './user_data/games/'+game_dir+'/'+assetsKey)
 
-                                pattern = re.compile(f'({asset.get("prefix", "")})({self.parent().characters[c].get("codename")})({asset.get("postfix", "")})([0-9]*)\\.([A-Za-z0-9]+)')
-                                filteredFiles = \
-                                    [f for f in files if pattern.match(f)]
+                                pattern = f'({asset.get("prefix", "")})({codename})({asset.get("postfix", "")})([0-9]*)\\.([A-Za-z0-9]+)'
+                                filteredFiles = MatchFilesWithPrefix(
+                                    files, pattern, f'{asset.get("prefix", "")}{codename}')
 
                                 for f in filteredFiles:
                                     numberStart = f.rfind(
@@ -609,6 +651,9 @@ class TSHGameAssetManager(QObject):
 
                     logger.info("Changed to game: "+game)
 
+                    # Asset files may have changed since the last load
+                    self.parent.assetDirCache = {}
+
                     self.parent.CopyCSS(game_dir)
 
                     gameObj = self.parent.games.get(game, {})
@@ -632,17 +677,18 @@ class TSHGameAssetManager(QObject):
 
                         assetsObj = gameObj.get(
                             "assets", {}).get(assetsKey, None)
-                        files = sorted(os.listdir(
-                            './user_data/games/'+game_dir+'/'+assetsKey))
+                        files = self.parent.ListAssetDir(
+                            './user_data/games/'+game_dir+'/'+assetsKey)
 
                         self.parent.stockIcons = {}
 
                         for c in self.parent.characters.keys():
                             self.parent.stockIcons[c] = {}
 
-                            pattern = re.compile(f'({assetsObj.get("prefix", "")})({self.parent().characters[c].get("codename")})({assetsObj.get("postfix", "")})([0-9]*)\\.([A-Za-z0-9]+)')
-                            filteredFiles = \
-                                [f for f in files if pattern.match(f)]
+                            codename = self.parent.characters[c].get("codename")
+                            pattern = f'({assetsObj.get("prefix", "")})({codename})({assetsObj.get("postfix", "")})([0-9]*)\\.([A-Za-z0-9]+)'
+                            filteredFiles = MatchFilesWithPrefix(
+                                files, pattern, f'{assetsObj.get("prefix", "")}{codename}')
 
                             if len(filteredFiles) == 0:
                                 # Store path only — QImage must be created on the main thread
@@ -673,15 +719,17 @@ class TSHGameAssetManager(QObject):
 
                         for c in self.parent.characters.keys():
                             self.parent.skins[c] = {}
+                            codename = self.parent.characters[c].get("codename")
                             for assetsKey in list(gameObj["assets"].keys()):
                                 asset = gameObj["assets"][assetsKey]
 
-                                files = sorted(os.listdir(
-                                    './user_data/games/'+game_dir+'/'+assetsKey))
+                                # Listed once per pack, not once per character
+                                files = self.parent.ListAssetDir(
+                                    './user_data/games/'+game_dir+'/'+assetsKey)
 
-                                pattern = re.compile(f'({asset.get("prefix", "")})({self.parent().characters[c].get("codename")})({asset.get("postfix", "")})([0-9]*)\\.([A-Za-z0-9]+)')
-                                filteredFiles = \
-                                    [f for f in files if pattern.match(f)]
+                                pattern = f'({asset.get("prefix", "")})({codename})({asset.get("postfix", "")})([0-9]*)\\.([A-Za-z0-9]+)'
+                                filteredFiles = MatchFilesWithPrefix(
+                                    files, pattern, f'{asset.get("prefix", "")}{codename}')
 
                                 for f in filteredFiles:
                                     numberStart = f.rfind(
@@ -1536,15 +1584,15 @@ class TSHGameAssetManager(QObject):
 
                     baseName = asset.get(
                         "prefix", "")+characterCodename+asset.get("postfix", "")
-                    pattern = f"({baseName})([0-9]*)\\.([A-Za-z0-9])"
+                    pattern = re.compile(f"({baseName})([0-9]*)\\.([A-Za-z0-9])")
 
-                    skinFileList = [f for f in os.listdir(
-                        assetPath) if re.match(pattern, f)]
+                    skinFileList = MatchFilesWithPrefix(
+                        self.ListAssetDir(assetPath), pattern, baseName)
 
                     skinFiles = {}
 
                     for f in skinFileList:
-                        skinId = re.search(pattern, f).group(2)
+                        skinId = pattern.search(f).group(2)
                         if skinId == "":
                             skinId = 0
                         else:

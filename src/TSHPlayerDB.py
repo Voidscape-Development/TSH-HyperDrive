@@ -26,6 +26,10 @@ class TSHPlayerDB:
     model: QStandardItemModel = None
     webServer = None
     modelLock = Lock()
+    # Character icons used by the model, built on demand. Reset when a game
+    # is loaded, which replaces TSHGameAssetManager's stockIcons.
+    iconCache = {}
+    iconCacheSource = None
     fieldnames = ["prefix", "gamerTag", "name", "twitter",
                 "country_code", "state_code", "mains", "pronoun", "custom_textbox", "controller"] # Used for filtering what we save locally
 
@@ -162,15 +166,25 @@ class TSHPlayerDB:
             cancelIcon = QIcon(QPixmap.fromImage(QImage("./assets/icons/cancel.svg").scaledToWidth(
                 32, Qt.TransformationMode.SmoothTransformation)))
 
-            charIcons = {}
+            stockIcons = TSHGameAssetManager.instance.stockIcons
+            if TSHPlayerDB.iconCacheSource is not stockIcons:
+                TSHPlayerDB.iconCache = {}
+                TSHPlayerDB.iconCacheSource = stockIcons
 
-            stock_icons = {k: dict(v) for k, v in TSHGameAssetManager.instance.stockIcons.items()}
-            for char, skins in stock_icons.items():
-                charIcons[char] = {}
-                for skin, path in skins.items():
-                    charIcons[char][skin] = QIcon(QPixmap.fromImage(
-                        QImage(path).scaledToWidth(
-                            32, Qt.TransformationMode.SmoothTransformation)))
+            def GetCharIcon(char, skin):
+                # Only the icons players actually use get decoded and scaled
+                key = (char, skin)
+                icon = TSHPlayerDB.iconCache.get(key)
+                if icon is None:
+                    # Misses aren't cached: stockIcons is filled in after
+                    # being assigned, so a missing entry may appear later
+                    path = stockIcons.get(char, {}).get(skin)
+                    if path:
+                        icon = QIcon(QPixmap.fromImage(
+                            QImage(path).scaledToWidth(
+                                32, Qt.TransformationMode.SmoothTransformation)))
+                        TSHPlayerDB.iconCache[key] = icon
+                return icon
 
             for player in TSHPlayerDB.database.values():
                 if player is not None:
@@ -215,14 +229,10 @@ class TSHPlayerDB:
                                     if playerMains[0][0] in TSHGameAssetManager.instance.characters.keys():
                                         character = playerMains[0]
 
-                                        assets = charIcons
-
-                                        if assets == None:
-                                            assets = {}
-
-                                        if assets.get(character[0], {}).get(int(playerMains[0][1]), None):
-                                            item.setIcon(assets.get(character[0], {}).get(
-                                                int(playerMains[0][1]), None))
+                                        icon = GetCharIcon(
+                                            character[0], int(character[1]))
+                                        if icon is not None:
+                                            item.setIcon(icon)
 
                         item.setData(player, Qt.ItemDataRole.UserRole)
 
