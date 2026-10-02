@@ -799,7 +799,7 @@ p, li { white-space: pre-wrap; }
         <location filename="../TournamentStreamHelper.py" line="196"/>
         <location filename="../TournamentStreamHelper.py" line="232"/>
         <location filename="../TournamentStreamHelper.py" line="740"/>
-        <location filename="../TournamentStreamHelper.py" line="1169"/>
+        <location filename="../TournamentStreamHelper.py" line="1172"/>
         <source>Warning</source>
         <translation>警告</translation>
     </message>
@@ -866,14 +866,14 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../TournamentStreamHelper.py" line="524"/>
-        <location filename="../TournamentStreamHelper.py" line="994"/>
+        <location filename="../TournamentStreamHelper.py" line="997"/>
         <source>Load tournament and sets from StartGG user</source>
         <translation>從StartGG用戶加載賽事與對陣</translation>
     </message>
     <message>
         <location filename="../TournamentStreamHelper.py" line="550"/>
-        <location filename="../TournamentStreamHelper.py" line="1016"/>
-        <location filename="../TournamentStreamHelper.py" line="1024"/>
+        <location filename="../TournamentStreamHelper.py" line="1019"/>
+        <location filename="../TournamentStreamHelper.py" line="1027"/>
         <source>Pull Latest Completed Sets from StartGG</source>
         <translation>從StartGG獲取最新已完成對局</translation>
     </message>
@@ -884,7 +884,7 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../TournamentStreamHelper.py" line="597"/>
-        <location filename="../TournamentStreamHelper.py" line="1236"/>
+        <location filename="../TournamentStreamHelper.py" line="1239"/>
         <source>Check for updates</source>
         <translation>檢查更新</translation>
     </message>
@@ -906,7 +906,7 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../TournamentStreamHelper.py" line="637"/>
-        <location filename="../TournamentStreamHelper.py" line="1336"/>
+        <location filename="../TournamentStreamHelper.py" line="1339"/>
         <source>Migrate Layout</source>
         <translation>遷移布局</translation>
     </message>
@@ -1007,93 +1007,93 @@ p, li { white-space: pre-wrap; }
         <translation>重命名計分板</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="991"/>
+        <location filename="../TournamentStreamHelper.py" line="994"/>
         <source>Load tournament and sets from ParryGG user</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1020"/>
+        <location filename="../TournamentStreamHelper.py" line="1023"/>
         <source>Pull Latest Completed Sets from ParryGG</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1171"/>
+        <location filename="../TournamentStreamHelper.py" line="1174"/>
         <source>Failed to fetch version from github:</source>
         <translation>無法從GitHub中獲取版本信息：</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1188"/>
+        <location filename="../TournamentStreamHelper.py" line="1191"/>
         <source>Updater</source>
         <translation>更新程序</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1194"/>
+        <location filename="../TournamentStreamHelper.py" line="1197"/>
         <source>New version available:</source>
         <translation>有新版本可用：</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1197"/>
+        <location filename="../TournamentStreamHelper.py" line="1200"/>
         <source>Update to latest version?</source>
         <translation>是否要更新到最新版本？</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1289"/>
+        <location filename="../TournamentStreamHelper.py" line="1292"/>
         <source>Change Tab Title</source>
         <translation>重命名計分板</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1294"/>
+        <location filename="../TournamentStreamHelper.py" line="1297"/>
         <source>Scoreboard Number</source>
         <translation>計分板編號</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1305"/>
+        <location filename="../TournamentStreamHelper.py" line="1308"/>
         <source>Set Tab Title</source>
         <translation>確認修改並保存</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1321"/>
+        <location filename="../TournamentStreamHelper.py" line="1324"/>
         <source>Migrate Scoreboard Layout</source>
         <translation>遷移計分板布局</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1326"/>
+        <location filename="../TournamentStreamHelper.py" line="1329"/>
         <source>File Path</source>
         <translation>文件路徑</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1329"/>
+        <location filename="../TournamentStreamHelper.py" line="1332"/>
         <source>Find File...</source>
         <translation>查找文件...</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1341"/>
+        <location filename="../TournamentStreamHelper.py" line="1344"/>
         <source>Open Layout Javascript File</source>
         <translation>打開布局Javascript文件</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1343"/>
+        <location filename="../TournamentStreamHelper.py" line="1346"/>
         <source>Javascript File</source>
         <translation>Javascript文件</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1373"/>
+        <location filename="../TournamentStreamHelper.py" line="1376"/>
         <source>Migration Complete</source>
         <translation>遷移完成</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1377"/>
+        <location filename="../TournamentStreamHelper.py" line="1380"/>
         <source>Layout Migration has completed!</source>
         <translation>布局遷移已完成！</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1381"/>
+        <location filename="../TournamentStreamHelper.py" line="1384"/>
         <source>Close Window</source>
         <translation>關閉窗口</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1203"/>
-        <location filename="../TSHScoreboardStageWidget.py" line="239"/>
+        <location filename="../TournamentStreamHelper.py" line="1206"/>
+        <location filename="../TSHScoreboardStageWidget.py" line="240"/>
         <location filename="../LayoutOptions/TSHLayoutOptionsWindow.py" line="55"/>
         <source>Update</source>
         <translation>更新</translation>
@@ -1101,9 +1101,9 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../TSHAssetDownloader.py" line="335"/>
         <location filename="../TSHAssetDownloader.py" line="543"/>
-        <location filename="../TournamentStreamHelper.py" line="1206"/>
-        <location filename="../TSHTournamentDataProvider.py" line="226"/>
-        <location filename="../TSHTournamentDataProvider.py" line="250"/>
+        <location filename="../TournamentStreamHelper.py" line="1209"/>
+        <location filename="../TSHTournamentDataProvider.py" line="229"/>
+        <location filename="../TSHTournamentDataProvider.py" line="253"/>
         <location filename="../Helpers/TSHDownloadHelper.py" line="210"/>
         <source>Cancel</source>
         <translation>取消</translation>
@@ -1124,22 +1124,22 @@ p, li { white-space: pre-wrap; }
         <translation>關閉本窗口前，請確保布局（layout）文件夾及內容未被其他應用程序打開</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1197"/>
+        <location filename="../TournamentStreamHelper.py" line="1200"/>
         <source>NOTE: This will open a new tab in your browser and close TournamentStreamHelper.</source>
         <translation>提示：此操作將在瀏攬器中打開新標籤頁，並關閉此程序。</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1221"/>
+        <location filename="../TournamentStreamHelper.py" line="1224"/>
         <source>Info</source>
         <translation>信息</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1223"/>
+        <location filename="../TournamentStreamHelper.py" line="1226"/>
         <source>You&apos;re already using the latest version</source>
         <translation>你當前已經是最新版本</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1236"/>
+        <location filename="../TournamentStreamHelper.py" line="1239"/>
         <source>Update available!</source>
         <translation>有可用更新！</translation>
     </message>
@@ -1293,7 +1293,7 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../TSHScoreboardPlayerWidget.py" line="87"/>
-        <location filename="../TSHScoreboardPlayerWidget.py" line="1031"/>
+        <location filename="../TSHScoreboardPlayerWidget.py" line="1026"/>
         <source>Save new player</source>
         <translation>保存選手信息</translation>
     </message>
@@ -1317,37 +1317,37 @@ p, li { white-space: pre-wrap; }
         <translation>選手{0}</translation>
     </message>
     <message>
-        <location filename="../TSHScoreboardPlayerWidget.py" line="1028"/>
+        <location filename="../TSHScoreboardPlayerWidget.py" line="1023"/>
         <source>Update player</source>
         <translation>更新選手信息</translation>
     </message>
     <message>
-        <location filename="../TSHScoreboardStageWidget.py" line="44"/>
+        <location filename="../TSHScoreboardStageWidget.py" line="45"/>
         <source>Ruleset</source>
         <translation>規則集</translation>
     </message>
     <message>
-        <location filename="../TSHScoreboardStageWidget.py" line="128"/>
+        <location filename="../TSHScoreboardStageWidget.py" line="129"/>
         <source>Open {0} in a browser to stage strike.</source>
         <translation>在瀏攬器中打開 {0} 進行場地禁選。</translation>
     </message>
     <message>
-        <location filename="../TSHScoreboardStageWidget.py" line="242"/>
+        <location filename="../TSHScoreboardStageWidget.py" line="243"/>
         <source>Save new</source>
         <translation>保存新規則</translation>
     </message>
     <message>
-        <location filename="../TSHScoreboardStageWidget.py" line="450"/>
+        <location filename="../TSHScoreboardStageWidget.py" line="451"/>
         <source>Number striked stages does not match the number of neutral stages. Should strike {0} more stage(s).</source>
         <translation>已禁選的地圖數量與起始地圖要求不符，還需要再禁選{0}個地圖。</translation>
     </message>
     <message>
-        <location filename="../TSHScoreboardStageWidget.py" line="458"/>
+        <location filename="../TSHScoreboardStageWidget.py" line="459"/>
         <source>The current ruleset is valid!</source>
         <translation>當前規則集可用！</translation>
     </message>
     <message>
-        <location filename="../TSHScoreboardStageWidget.py" line="511"/>
+        <location filename="../TSHScoreboardStageWidget.py" line="512"/>
         <source>The text for banByMaxGames is invalid.</source>
         <translation>按局數設置禁圖的格式不正確</translation>
     </message>
@@ -1657,7 +1657,7 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../TSHTournamentInfoWidget.py" line="147"/>
         <location filename="../TSHTournamentInfoWidget.py" line="148"/>
-        <location filename="../TSHTournamentDataProvider.py" line="88"/>
+        <location filename="../TSHTournamentDataProvider.py" line="91"/>
         <source>Error</source>
         <translation>錯誤</translation>
     </message>
@@ -1683,69 +1683,69 @@ p, li { white-space: pre-wrap; }
         <translation>隊伍 {0}</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="91"/>
+        <location filename="../TSHTournamentDataProvider.py" line="94"/>
         <source>Parry.gg API key has not been set. Please configure it in Settings &gt; API Keys.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="92"/>
+        <location filename="../TSHTournamentDataProvider.py" line="95"/>
         <source>API keys can be created at: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="162"/>
+        <location filename="../TSHTournamentDataProvider.py" line="165"/>
         <source>Paste the tournament URL.</source>
         <translation>請粘跕賽事鍊接</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="162"/>
+        <location filename="../TSHTournamentDataProvider.py" line="165"/>
         <source>For StartGG, the link must contain the /event/ part</source>
         <translation>針對StartGG平臺，鍊接必須包含/event/路徑</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="162"/>
+        <location filename="../TSHTournamentDataProvider.py" line="165"/>
         <source>Supported providers:</source>
         <translation>支持的數據提供商</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="167"/>
-        <location filename="../TSHTournamentDataProvider.py" line="227"/>
-        <location filename="../TSHTournamentDataProvider.py" line="251"/>
+        <location filename="../TSHTournamentDataProvider.py" line="170"/>
+        <location filename="../TSHTournamentDataProvider.py" line="230"/>
+        <location filename="../TSHTournamentDataProvider.py" line="254"/>
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="191"/>
+        <location filename="../TSHTournamentDataProvider.py" line="194"/>
         <source>Set tournament URL</source>
         <translation>設置賽事鍊接</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="224"/>
+        <location filename="../TSHTournamentDataProvider.py" line="227"/>
         <source>Set Twitch username</source>
         <translation>設置Twitch用戶名</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="225"/>
+        <location filename="../TSHTournamentDataProvider.py" line="228"/>
         <source>Twitch Username:</source>
         <translation>Twitch用戶名</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="236"/>
+        <location filename="../TSHTournamentDataProvider.py" line="239"/>
         <source>Paste the URL to the player&apos;s StartGG profile</source>
         <translation>請粘跕該選手的StartGG個人主頁鍊接</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="240"/>
+        <location filename="../TSHTournamentDataProvider.py" line="243"/>
         <source>Paste the URL to the player&apos;s ParryGG profile</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="243"/>
+        <location filename="../TSHTournamentDataProvider.py" line="246"/>
         <source>Invalid tournament data provider</source>
         <translation>賽事數據提供商無效</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="248"/>
+        <location filename="../TSHTournamentDataProvider.py" line="251"/>
         <source>Set player</source>
         <translation>設置選手</translation>
     </message>
@@ -1755,7 +1755,7 @@ p, li { white-space: pre-wrap; }
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../Helpers/TSHCountryHelper.py" line="209"/>
+        <location filename="../Helpers/TSHCountryHelper.py" line="210"/>
         <source>Custom Flags</source>
         <translation>自定義旗幟</translation>
     </message>
@@ -2075,25 +2075,25 @@ p, li { white-space: pre-wrap; }
 <context>
     <name>punctuation</name>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="999"/>
+        <location filename="../TournamentStreamHelper.py" line="1002"/>
         <location filename="../TSHSelectSetWindow.py" line="139"/>
         <source>(</source>
         <translation>（</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1001"/>
+        <location filename="../TournamentStreamHelper.py" line="1004"/>
         <location filename="../TSHSelectSetWindow.py" line="140"/>
         <source>)</source>
         <translation>）</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1236"/>
+        <location filename="../TournamentStreamHelper.py" line="1239"/>
         <location filename="../Helpers/TSHVersionHelper.py" line="20"/>
         <source>[</source>
         <translation>【</translation>
     </message>
     <message>
-        <location filename="../TournamentStreamHelper.py" line="1236"/>
+        <location filename="../TournamentStreamHelper.py" line="1239"/>
         <location filename="../Helpers/TSHVersionHelper.py" line="20"/>
         <location filename="../Helpers/TSHVersionHelper.py" line="21"/>
         <source>]</source>
