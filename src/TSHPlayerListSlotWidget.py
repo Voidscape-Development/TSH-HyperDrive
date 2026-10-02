@@ -123,7 +123,7 @@ class TSHPlayerListSlotWidget(QGroupBox):
             for pw in self.playerWidgets:
                 pw.SetCharactersPerPlayer(value)
 
-    def SetTeamData(self, data):
+    def SetTeamData(self, data, enrichBlocking=True):
         data = data or {}
 
         try:
@@ -147,7 +147,8 @@ class TSHPlayerListSlotWidget(QGroupBox):
                             data.get("players")[i]["wins"] = data.get("wins")
                             data.get("players")[i]["losses"] = data.get("losses")
                             data.get("players")[i]["winPercentage"] = data.get("winPercentage")
-                            pw.SetData(data.get("players")[i])
+                            pw.SetData(data.get("players")[i],
+                                       enrichBlocking=enrichBlocking)
                         except:
                             pw.Clear()
                             logger.error(traceback.format_exc())

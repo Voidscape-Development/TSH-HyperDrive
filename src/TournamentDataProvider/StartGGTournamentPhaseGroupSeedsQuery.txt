@@ -6,6 +6,7 @@ query TournamentPhaseGroupSeedsQuery($id: ID!, $page: Int!, $perPage: Int!) {
 				totalPages
 			}
 			nodes {
+				id
 				seedNum
 				progressionSource {
 					originPhaseGroup {

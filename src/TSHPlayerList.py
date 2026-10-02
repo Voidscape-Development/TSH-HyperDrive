@@ -58,7 +58,7 @@ class TSHPlayerList(QWidget):
         TSHTournamentDataProvider.instance.GetStandings(
             self.slotNumber.value(), self.signals.UpdateData)
 
-    def LoadFromStandings(self, data):
+    def LoadFromStandings(self, data, enrichBlocking=True):
         data = data or []
 
         with StateManager.SaveBlock():
@@ -74,7 +74,7 @@ class TSHPlayerList(QWidget):
                         # than there is data (e.g. a slot failed to be removed)
                         if i >= len(data):
                             break
-                        slot.SetTeamData(data[i])
+                        slot.SetTeamData(data[i], enrichBlocking=enrichBlocking)
                 finally:
                     self.childDataChangedLock = False
 

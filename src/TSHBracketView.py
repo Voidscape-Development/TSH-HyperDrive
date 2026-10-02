@@ -68,17 +68,35 @@ class BracketSetWidget(QWidget):
         self.sizePolicy().setRetainSizeWhenHidden(True)
         self.layout().setSpacing(2)
 
-        if self.bracketSet is not None:
-            hasBye = \
-                ((self.bracketSet.playerIds[0] == -1 and not self.bracketSet.playerIds[1] == -1) or
-                 (self.bracketSet.playerIds[1] == -1 and not self.bracketSet.playerIds[0] == -1))
+        if self.bracketSet is not None and self.bracketSet.bracket.isGraph:
+            # Like start.gg, bye sets aren't shown but keep their spot so
+            # the rest of the round stays lined up with the sets it leads to
+            policy = self.sizePolicy()
+            policy.setRetainSizeWhenHidden(True)
+            self.setSizePolicy(policy)
 
-            if self.bracketSet.pos[0] < 0 and hasBye:
-                self.hide()
-            elif self.bracketSet.pos[0] > 0 and self.bracketSet.pos[0] == 1 and hasBye:
-                self.hide()
-            else:
-                self.show()
+        self.UpdateVisibility()
+
+    def UpdateVisibility(self):
+        if self.bracketSet is None:
+            return
+
+        playerIds = self.bracketSet.playerIds
+
+        if self.bracketSet.bracket.isGraph:
+            self.setVisible(BracketSet.BYE not in playerIds)
+            return
+
+        hasBye = \
+            ((playerIds[0] == -1 and not playerIds[1] == -1) or
+             (playerIds[1] == -1 and not playerIds[0] == -1))
+
+        if self.bracketSet.pos[0] < 0 and hasBye:
+            self.hide()
+        elif self.bracketSet.pos[0] > 0 and self.bracketSet.pos[0] == 1 and hasBye:
+            self.hide()
+        else:
+            self.show()
 
     def SetScore(self, id, score, updateDisplay=True):
         self.bracketSet.score[id] = score
@@ -93,7 +111,14 @@ class BracketSetWidget(QWidget):
             self.bracketSet.bracket.UpdateBracket()
             self.bracketView.Update()
 
-    def Update(self):
+    @staticmethod
+    def _SetStyle(widget, styleSheet):
+        # Setting a style sheet restyles the widget even if it didn't change,
+        # which adds up quickly over every set of a big bracket
+        if widget.styleSheet() != styleSheet:
+            widget.setStyleSheet(styleSheet)
+
+    def Update(self, offsets=None):
         if self.bracketSet is not None:
             self.playerId[0].setText(str(self.bracketSet.playerIds[0]))
             self.playerId[1].setText(str(self.bracketSet.playerIds[1]))
@@ -112,21 +137,19 @@ class BracketSetWidget(QWidget):
             self.score[0].blockSignals(False)
             self.score[1].blockSignals(False)
 
+            won = "background-color: rgba(0, 255, 0, 50);"
+            dimmed = "background-color: rgba(0, 0, 0, 80);"
+            clear = "background-color: rgba(0, 0, 0, 0);"
+
             if self.bracketSet.score[0] > self.bracketSet.score[1]:
-                self.score[0].setStyleSheet(
-                    "background-color: rgba(0, 255, 0, 50);")
-                self.score[1].setStyleSheet(
-                    "background-color: rgba(0, 0, 0, 80);")
+                self._SetStyle(self.score[0], won)
+                self._SetStyle(self.score[1], dimmed)
             elif self.bracketSet.score[0] < self.bracketSet.score[1]:
-                self.score[1].setStyleSheet(
-                    "background-color: rgba(0, 255, 0, 50);")
-                self.score[0].setStyleSheet(
-                    "background-color: rgba(0, 0, 0, 80);")
+                self._SetStyle(self.score[1], won)
+                self._SetStyle(self.score[0], dimmed)
             else:
-                self.score[0].setStyleSheet(
-                    "background-color: rgba(0, 0, 0, 80);")
-                self.score[1].setStyleSheet(
-                    "background-color: rgba(0, 0, 0, 80);")
+                self._SetStyle(self.score[0], dimmed)
+                self._SetStyle(self.score[1], dimmed)
 
             try:
                 if (self.bracketSet.playerIds[0]-1) < len(self.bracketView.playerList.slotWidgets) and self.bracketSet.playerIds[0] > 0:
@@ -163,42 +186,23 @@ class BracketSetWidget(QWidget):
                 self.finished.setChecked(self.bracketSet.finished)
                 self.finished.blockSignals(False)
 
-            winnersCutout, losersCutout = self.bracketView.GetCutouts()
-            hasBye = \
-                ((self.bracketSet.playerIds[0] == -1 and not self.bracketSet.playerIds[1] == -1) or
-                 (self.bracketSet.playerIds[1] == -1 and not self.bracketSet.playerIds[0] == -1))
+            self.UpdateVisibility()
 
-            if self.bracketSet.pos[0] < 0 and hasBye:
-                self.hide()
-            elif self.bracketSet.pos[0] > 0 and self.bracketSet.pos[0] == 1 and hasBye:
-                self.hide()
-            else:
-                self.show()
-
-            limitExportNumber, winnersOffset, losersOffset = self.bracketView.GetLimitedExportingBracketOffsets()
+            # Same for every set, so TSHBracketView.Update passes it in
+            if offsets is None:
+                offsets = self.bracketView.GetLimitedExportingBracketOffsets()
+            limitExportNumber, winnersOffset, losersOffset = offsets
 
             if self.bracketSet.pos[0] > 0:
-                if self.bracketSet.pos[0] - winnersOffset <= 0:
-                    self.name[0].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 80);")
-                    self.name[1].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 80);")
-                else:
-                    self.name[0].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 0);")
-                    self.name[1].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 0);")
+                cut = self.bracketSet.pos[0] - winnersOffset <= 0
             elif self.bracketSet.pos[0] < 0:
-                if self.bracketSet.pos[0] + losersOffset >= 0:
-                    self.name[0].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 80);")
-                    self.name[1].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 80);")
-                else:
-                    self.name[0].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 0);")
-                    self.name[1].setStyleSheet(
-                        "background-color: rgba(0, 0, 0, 0);")
+                cut = self.bracketSet.pos[0] + losersOffset >= 0
+            else:
+                cut = None
+
+            if cut is not None:
+                self._SetStyle(self.name[0], dimmed if cut else clear)
+                self._SetStyle(self.name[1], dimmed if cut else clear)
 
 
 class TSHBracketView(QGraphicsView):
@@ -222,11 +226,22 @@ class TSHBracketView(QGraphicsView):
         self.setFrameShape(QFrame.NoFrame)
         self.setDragMode(QGraphicsView.ScrollHandDrag)
 
-        self.SetBracket(bracket)
-
         self.bracketLines = []
 
+        # Lines and zoom depend on the final widget geometry, which is only
+        # known once Qt has processed the layout requests. Instead of forcing
+        # that with processEvents() (which repaints a half built bracket and
+        # lets other signals re-enter us), redraw on the next loop iteration.
+        self._redrawPending = False
+        self._fitPending = False
+
+        self.SetBracket(bracket)
+
     def GetCutouts(self, forExport=False):
+        # A bracket built from the provider's sets has no padding rounds
+        if self.bracket.isGraph:
+            return ([0, math.inf], [0, math.inf])
+
         winnersRounds = [r for r in self.bracket.rounds.keys() if int(r) > 0]
         losersRounds = [r for r in self.bracket.rounds.keys() if int(r) < 0]
 
@@ -281,12 +296,14 @@ class TSHBracketView(QGraphicsView):
         bracket.progressionsIn = progressionsIn
         bracket.progressionsOut = progressionsOut
 
-        if bracket.progressionsIn > 0:
-            bracket.winnersOnlyProgressions = winnersOnlyProgressions
-        else:
-            bracket.winnersOnlyProgressions = True
+        # A bracket built from the provider's sets already knows these
+        if not bracket.isGraph:
+            if bracket.progressionsIn > 0:
+                bracket.winnersOnlyProgressions = winnersOnlyProgressions
+            else:
+                bracket.winnersOnlyProgressions = True
 
-        bracket.customSeeding = customSeeding
+            bracket.customSeeding = customSeeding
 
         self.bracketLines = []
         self._scene.clear()
@@ -363,9 +380,27 @@ class TSHBracketView(QGraphicsView):
             self.bracketWidgets.append(roundWidgets)
             currentWidgets.append(roundWidgets)
 
-        QGuiApplication.processEvents()
-        self.DrawLines()
-        self.fitInView()
+        self.ScheduleRedraw(fit=True)
+
+    def ScheduleRedraw(self, fit=False):
+        self._fitPending = self._fitPending or fit
+        if self._redrawPending:
+            return
+        self._redrawPending = True
+        QTimer.singleShot(0, self._Redraw)
+
+    def _Redraw(self):
+        self._redrawPending = False
+        fit = self._fitPending
+        self._fitPending = False
+        try:
+            self.DrawLines()
+            if fit:
+                self.fitInView()
+        except RuntimeError:
+            # The bracket widgets were replaced in the meantime; the rebuild
+            # schedules its own redraw
+            logger.warning("Bracket widgets deleted before redraw")
 
     def GetLimitedExportingBracketOffsets(self):
         limitExportNumber = -1
@@ -387,7 +422,7 @@ class TSHBracketView(QGraphicsView):
                 logger.error(traceback.format_exc())
                 losersRounds = 0
 
-            if self.bracketWidget.progressionsIn.value() > 0:
+            if self.bracketWidget.progressionsIn.value() > 0 and not self.bracket.isGraph:
                 StateManager.Set("bracket.bracket.progressionsIn", 0)
                 losersRounds += 2
                 winnersRounds += 1
@@ -406,17 +441,17 @@ class TSHBracketView(QGraphicsView):
     def Update(self):
         self.bracket.UpdateBracket()
 
+        offsets = self.GetLimitedExportingBracketOffsets()
+
         for round in self.bracketWidgets:
             for setWidget in round:
                 for w in setWidget.score:
                     w.blockSignals(True)
-                setWidget.Update()
+                setWidget.Update(offsets)
                 for w in setWidget.score:
                     w.blockSignals(False)
 
-        QGuiApplication.processEvents()
-
-        self.DrawLines()
+        self.ScheduleRedraw()
 
         with StateManager.SaveBlock():
             self.ExportBracketState()
@@ -499,12 +534,20 @@ class TSHBracketView(QGraphicsView):
                 # print(f"Round pos {bracketSet.pos} L→ {nextLose}")
 
                 # Reassign rounds based on export number
-                if nextWin:
+                if self.bracket.isGraph:
+                    # Rounds are only shifted by the limited export here
+                    for nxt in (nextWin, nextLose):
+                        if nxt:
+                            if nxt[0] > 0:
+                                nxt[0] -= winnersOffset
+                            else:
+                                nxt[0] += losersOffset
+                elif nextWin:
                     if nextWin[0] > 0:
                         nextWin[0] -= winnersOffset
                     else:
                         nextWin[0] += losersOffset - 2
-                if nextLose:
+                if nextLose and not self.bracket.isGraph:
                     if nextLose[0] < 0:
                         nextLose[0] += losersOffset - 2
 
@@ -562,6 +605,11 @@ class TSHBracketView(QGraphicsView):
 
         path = QPainterPath()
         dashedPath = QPainterPath()
+
+        if self.bracket.isGraph:
+            self.DrawGraphLines(path, dashedPath)
+            self.AddLinePaths(path, dashedPath)
+            return
 
         for i, round in enumerate(self.winnersBracketWidgets):
             for j, setWidget in enumerate(round):
@@ -700,6 +748,65 @@ class TSHBracketView(QGraphicsView):
                 except:
                     logger.error(traceback.format_exc())
 
+        self.AddLinePaths(path, dashedPath)
+
+    def DrawGraphLines(self, path, dashedPath):
+        # Follow the real links between sets instead of assuming every round
+        # halves the previous one
+        widgets = {}
+        for round in self.bracketWidgets:
+            for setWidget in round:
+                widgets[setWidget.bracketSet] = setWidget
+
+        def Left(widget):
+            return QPointF(widget.mapTo(self.bracketLayout, QPoint(0, 0))) + \
+                QPointF(0, widget.height()/2)
+
+        def Right(widget):
+            return Left(widget) + QPointF(widget.width(), 0)
+
+        for setWidget in widgets.values():
+            if setWidget.isHidden():
+                continue
+
+            _set = setWidget.bracketSet
+            nxt = _set.winNext
+
+            if nxt is not None:
+                # Winners into grand finals isn't drawn, same as the old view
+                if (nxt.pos[0] > 0) != (_set.pos[0] > 0):
+                    continue
+                nxtWidget = widgets.get(nxt)
+                if nxtWidget is None or nxtWidget.isHidden():
+                    continue
+
+                start = Right(setWidget)
+                end = Left(nxtWidget)
+                midX = start.x()+(end.x()-start.x())/2
+
+                path.addPolygon(QPolygonF([
+                    start,
+                    QPointF(midX, start.y()),
+                    QPointF(midX, end.y()),
+                    end
+                ]))
+            elif self.progressionsOut > 0:
+                start = Right(setWidget)
+                end = start + QPointF(50, 0)
+                path.addPolygon(QPolygonF([start, end]))
+                path.addPolygon(QPolygonF([
+                    end + QPointF(-10, +10),
+                    end,
+                    end + QPointF(-10, -10)
+                ]))
+
+            # Players coming in from another phase
+            if self.progressionsIn > 0 and any(p and p > 0 for p in _set.fixedIds):
+                end = Left(setWidget)
+                dashedPath.addPolygon(
+                    QPolygonF([end - QPointF(50, 0), end]))
+
+    def AddLinePaths(self, path, dashedPath):
         pen = QPen(Qt.gray, 4, Qt.SolidLine)
         pen2 = QPen(Qt.black, 6, Qt.SolidLine)
 

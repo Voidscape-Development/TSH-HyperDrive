@@ -29,6 +29,8 @@ class TSHTournamentDataProviderSignals(QObject):
     stream_queue_loaded = Signal(dict)
     sets_data_updated = Signal(dict)
     tournament_url_update = Signal(str)
+    # Mains requested by a non-blocking EnrichPlayerData arrived
+    player_mains_updated = Signal()
 
 
 class TSHTournamentDataProvider(QObject):

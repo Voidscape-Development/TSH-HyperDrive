@@ -84,12 +84,19 @@ class TournamentDataProvider(QObject):
     def GetFutureMatchesList(self, sets: object, progress_callback=None, cancel_event=None):
         pass
 
-    def EnrichPlayerData(self, playerData):
+    def EnrichPlayerData(self, playerData, blocking=True):
         # Hook for providers to lazily fill in fields when a player is
         # loaded into a slot (called from TSHScoreboardPlayerWidget.SetData
         # post-DB-merge). Default no-op; ParryGG overrides to fetch mains
-        # from a linked start.gg account.
+        # from a linked start.gg account. With blocking=False, providers
+        # must not do network requests here (it runs on the UI thread);
+        # they should only use what they already have cached.
         return playerData
+
+    def GetCachedMains(self, playerData):
+        # Mains EnrichPlayerData would add for this player without doing a
+        # request, or None if it doesn't have them (yet).
+        return None
 
     def ConvertStreamUrl(self, stream):
         if "twitch.tv" in stream:

@@ -18,6 +18,11 @@ class BracketSet():
         self.loseNextSlot: int = 0
         self.pos = pos
         self.finished = False
+        # Only used by brackets built with Bracket.FromGraph:
+        # slots filled by a seed/bye instead of another set's result
+        self.fixedIds = [None, None]
+        # Winner reported by the provider, for sets without a decisive score
+        self.winnerSlot = None
 
 # Bracket always has a power of 2 number of players
 # if there are less than that, we round up and add
@@ -54,7 +59,17 @@ def nextLayer(pls):
     return out
 
 
+def _IdentifierKey(identifier):
+    # start.gg identifiers go A, B, ..., Z, AA, AB, ...
+    identifier = str(identifier or "")
+    return (len(identifier), identifier)
+
+
 class Bracket():
+    # Built from a provider's real set graph (see FromGraph) instead of
+    # synthesized as a standard power of 2 double elimination bracket
+    isGraph = False
+
     def __init__(self, playerNumber, progressionsIn, seedMap=None, winnersOnlyProgressions=False, customSeeding=False, progressionsOut=0) -> None:
         self.originalPlayerNumber = playerNumber
         self.playerNumber = next_power_of_2(playerNumber)
@@ -205,12 +220,240 @@ class Bracket():
         self.rounds[str(gfsRound)][0].loseNext = self.rounds[str(
             gfsResetRound)][0]
 
+    @classmethod
+    def FromGraph(cls, graph, playerNumber):
+        """
+        Builds the bracket from the provider's own sets and the links between
+        them, so its shape, losers drops, byes and round names match the
+        provider exactly instead of being guessed.
+
+        graph = {"sets": [{
+            "id": str, "round": int (> 0 winners, < 0 losers),
+            "identifier": str, "name": str (round name),
+            "score": [int|None, int|None], "finished": bool,
+            "winnerSlot": 0|1|None,
+            "slots": [{
+                "prereqType": "seed"|"set"|"bye"|...,
+                "prereqId": str|None, "placement": 1 (winner)|2 (loser)|None,
+                "player": 1-based entrant index|None
+            }, ...]
+        }, ...]}
+        """
+        sets = {}
+        for s in (graph or {}).get("sets") or []:
+            sets.setdefault(str(s.get("id")), s)
+
+        if not sets:
+            raise ValueError("Bracket graph has no sets")
+
+        side = {}
+        depth = {}
+        for id, s in sets.items():
+            round = int(s.get("round") or 0)
+            if round == 0:
+                raise ValueError(f"Set {id} has no round")
+            side[id] = 1 if round > 0 else -1
+            depth[id] = abs(round)
+
+        def SetPrereqs(s):
+            for slotIndex, slot in enumerate((s.get("slots") or [])[:2]):
+                prereqId = slot.get("prereqId")
+                if slot.get("prereqType") == "set" and prereqId is not None and str(prereqId) in sets:
+                    yield slotIndex, str(prereqId), slot.get("placement") or 1
+
+        # Sets must come after the sets that feed them on the same side. The
+        # only case where the provider's round numbers don't already do that
+        # is the grand final reset, which start.gg puts in the grand final's
+        # round.
+        for _ in range(len(sets) + 1):
+            changed = False
+            for id, s in sets.items():
+                for _slot, prereqId, _placement in SetPrereqs(s):
+                    if side[prereqId] == side[id] and depth[prereqId] >= depth[id]:
+                        depth[id] = depth[prereqId] + 1
+                        changed = True
+            if not changed:
+                break
+        else:
+            raise ValueError("Bracket graph has a cycle")
+
+        # Renumber rounds so each side goes 1, 2, 3... with no gaps
+        roundOf = {}
+        for sign in (1, -1):
+            depths = sorted({depth[id] for id in sets if side[id] == sign})
+            remap = {d: i + 1 for i, d in enumerate(depths)}
+            for id in sets:
+                if side[id] == sign:
+                    roundOf[id] = sign * remap[depth[id]]
+
+        columns = {}
+        for id in sets:
+            columns.setdefault(roundOf[id], []).append(id)
+
+        # Order each round top to bottom by walking back from the last round
+        # of each side: the sets feeding a set go where that set is.
+        order = {}
+        for sign in (1, -1):
+            keys = sorted([k for k in columns if k * sign > 0], key=abs)
+            if not keys:
+                continue
+
+            def ByIdentifier(ids):
+                return sorted(ids, key=lambda id: (_IdentifierKey(sets[id].get("identifier")), id))
+
+            order[keys[-1]] = ByIdentifier(columns[keys[-1]])
+
+            for k in reversed(keys[:-1]):
+                ordered = []
+                seen = set()
+                for consumerId in order[keys[keys.index(k) + 1]]:
+                    for _slot, prereqId, _placement in SetPrereqs(sets[consumerId]):
+                        if roundOf[prereqId] == k and prereqId not in seen:
+                            seen.add(prereqId)
+                            ordered.append(prereqId)
+                ordered.extend(ByIdentifier(
+                    [id for id in columns[k] if id not in seen]))
+                order[k] = ordered
+
+        bracket = cls.__new__(cls)
+        bracket.isGraph = True
+        bracket.originalPlayerNumber = playerNumber
+        bracket.playerNumber = next_power_of_2(max(playerNumber, 1))
+        bracket.progressionsIn = 0
+        bracket.progressionsOut = 0
+        bracket.seedMap = None
+        bracket.customSeeding = False
+        bracket.roundNames = {}
+        bracket.rounds = {}
+
+        bracketSets = {}
+        roundKeys = sorted([k for k in order if k > 0]) + \
+            sorted([k for k in order if k < 0], reverse=True)
+
+        for k in roundKeys:
+            bracket.rounds[str(k)] = []
+            for j, id in enumerate(order[k]):
+                s = sets[id]
+                _set = BracketSet(bracket, [k, j])
+                score = list(s.get("score") or [None, None])[:2]
+                score += [None] * (2 - len(score))
+                _set.score = [v if v is not None else 0 for v in score]
+                _set.finished = bool(s.get("finished"))
+                _set.winnerSlot = s.get("winnerSlot")
+                bracket.rounds[str(k)].append(_set)
+                bracketSets[id] = _set
+
+                if str(k) not in bracket.roundNames and s.get("name"):
+                    bracket.roundNames[str(k)] = s.get("name")
+
+        # Entrants coming into the losers side means players progress into
+        # this bracket into both winners and losers
+        bracket.winnersOnlyProgressions = True
+
+        for id, s in sets.items():
+            _set = bracketSets[id]
+            slots = (s.get("slots") or [])[:2]
+            for slotIndex in range(2):
+                slot = slots[slotIndex] if slotIndex < len(slots) else {}
+                prereqId = slot.get("prereqId")
+                prereqType = slot.get("prereqType")
+
+                if prereqType == "set" and prereqId is not None and str(prereqId) in bracketSets:
+                    source = bracketSets[str(prereqId)]
+                    if (slot.get("placement") or 1) == 2:
+                        source.loseNext = _set
+                        source.loseNextSlot = slotIndex
+                    else:
+                        source.winNext = _set
+                        source.winNextSlot = slotIndex
+                    _set.playerIds[slotIndex] = BracketSet.PENDING
+                    continue
+
+                player = slot.get("player")
+                if player:
+                    _set.fixedIds[slotIndex] = int(player)
+                    if roundOf[id] < 0:
+                        bracket.winnersOnlyProgressions = False
+                elif prereqType == "set" and (slot.get("placement") or 1) != 2:
+                    # Winner of a set we don't have: still to be decided
+                    _set.fixedIds[slotIndex] = BracketSet.PENDING
+                else:
+                    _set.fixedIds[slotIndex] = BracketSet.BYE
+                _set.playerIds[slotIndex] = _set.fixedIds[slotIndex]
+
+        # Order to resolve results in: every set after the sets feeding it
+        incoming = {_set: 0 for _set in bracketSets.values()}
+        for _set in bracketSets.values():
+            for nxt in (_set.winNext, _set.loseNext):
+                if nxt is not None:
+                    incoming[nxt] += 1
+
+        ready = [_set for _set in bracketSets.values()
+                 if incoming[_set] == 0]
+        bracket.graphOrder = []
+        while ready:
+            _set = ready.pop()
+            bracket.graphOrder.append(_set)
+            for nxt in (_set.winNext, _set.loseNext):
+                if nxt is not None:
+                    incoming[nxt] -= 1
+                    if incoming[nxt] == 0:
+                        ready.append(nxt)
+
+        if len(bracket.graphOrder) != len(bracketSets):
+            raise ValueError("Bracket graph has a cycle")
+
+        bracket.UpdateBracket()
+
+        return bracket
+
+    def _UpdateGraphBracket(self):
+        for _set in self.graphOrder:
+            for slot in range(2):
+                if _set.fixedIds[slot] is not None:
+                    _set.playerIds[slot] = _set.fixedIds[slot]
+                else:
+                    _set.playerIds[slot] = BracketSet.PENDING
+
+        for _set in self.graphOrder:
+            p1, p2 = _set.playerIds
+
+            if p1 == BracketSet.BYE and p2 == BracketSet.BYE:
+                won, lost = BracketSet.BYE, BracketSet.BYE
+            elif p2 == BracketSet.BYE:
+                won, lost = p1, BracketSet.BYE
+            elif p1 == BracketSet.BYE:
+                won, lost = p2, BracketSet.BYE
+            elif p1 == BracketSet.PENDING or p2 == BracketSet.PENDING or not _set.finished:
+                won, lost = BracketSet.PENDING, BracketSet.PENDING
+            else:
+                winner = None
+                if _set.score[0] != _set.score[1]:
+                    winner = 0 if _set.score[0] > _set.score[1] else 1
+                elif _set.winnerSlot in (0, 1):
+                    # e.g. reported without a score
+                    winner = _set.winnerSlot
+
+                if winner is None:
+                    won, lost = BracketSet.PENDING, BracketSet.PENDING
+                else:
+                    won, lost = _set.playerIds[winner], _set.playerIds[1 - winner]
+
+            if _set.winNext:
+                _set.winNext.playerIds[_set.winNextSlot] = won
+            if _set.loseNext:
+                _set.loseNext.playerIds[_set.loseNextSlot] = lost
+
     def IsBye(self, playerId):
         if playerId == -1 or playerId > self.originalPlayerNumber:
             return True
         return False
 
     def UpdateBracket(self):
+        if self.isGraph:
+            self._UpdateGraphBracket()
+            return
+
         for roundKey, round in sorted(self.rounds.items(), key=lambda x: (int(x[0]) < 0, abs(int(x[0])))):
             for j, _set in enumerate(round):
                 targetIdW = j % 2
@@ -295,6 +538,14 @@ class Bracket():
     # Get round names
     def GetRoundName(self, round: str, winnersCutout=[0, 0], losersCutout=[0, 0]):
         roundNumber = int(round)
+
+        if self.isGraph:
+            name = self.roundNames.get(str(roundNumber))
+            if name:
+                return name
+            if roundNumber > 0:
+                return TSHLocaleHelper.matchNames.get("winners_round").format(roundNumber)
+            return TSHLocaleHelper.matchNames.get("losers_round").format(abs(roundNumber))
 
         gfsRound = max([int(r) for r in self.rounds.keys()]) - 1
         lastLosers = min([int(r) for r in self.rounds.keys()])

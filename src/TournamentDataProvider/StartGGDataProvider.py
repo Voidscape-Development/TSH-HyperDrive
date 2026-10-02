@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, deque
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.cookiejar import DefaultCookiePolicy
 import re
@@ -18,7 +18,7 @@ from ..TSHPlayerDB import TSHPlayerDB
 from .TournamentDataProvider import TournamentDataProvider
 import orjson
 from ..Helpers.TSHLocaleHelper import TSHLocaleHelper
-from ..TSHBracket import is_power_of_two
+from ..TSHBracket import Bracket, is_power_of_two
 
 from ..Workers import Worker
 
@@ -40,6 +40,10 @@ _sessionMethods = {requests.get: "GET", requests.post: "POST"}
 
 
 class StartGGDataProvider(TournamentDataProvider):
+    # GetTournamentPhaseGroup returns the real set graph ("graph"), so the
+    # bracket widget can show any elimination bracket exactly like start.gg
+    SUPPORTS_BRACKET_GRAPH = True
+
     CompletedSetsQuery = None
     EntrantsQuery = None
     # request for a single set with only info relevant for a set that is yet to be played
@@ -68,13 +72,22 @@ class StartGGDataProvider(TournamentDataProvider):
         super().__init__(url, threadpool, tshTdp)
         self.name = "StartGG"
         self._mains_cache = {}
+        # Players whose mains a bulk load (e.g. the bracket) needs, fetched
+        # one by one in the background instead of on the UI thread
+        self._mainsQueue = deque()
+        self._mainsQueued = set()
+        self._mainsQueueLock = threading.Lock()
+        self._mainsQueueThread = None
 
-    # Queries the provided URL until a proper 200 status code has been provided back
-    #
-    # This should work fine in theory unless an API restriction is added
-    def QueryRequests(self, url=None, type=None, headers=None, jsonParams=None, params=None):
+    # Status codes worth trying again: rate limiting and server-side errors.
+    # Anything else (bad query, auth, not found) fails the same way every time.
+    _retryStatusCodes = {429, 500, 502, 503, 504}
+    _maxRetryDelaySecs = 8.0
+
+    # Queries the provided URL, retrying (with backoff) while start.gg is rate
+    # limiting us or having server trouble
+    def QueryRequests(self, url=None, type=None, headers=None, jsonParams=None, params=None, retries=5, timeout=None):
         try:
-            requestCode = 0
             data = None
             headers = dict(headers or {})
             headers.update({
@@ -82,20 +95,44 @@ class StartGGDataProvider(TournamentDataProvider):
                 "Content-Type": "application/json",
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
             })
-            retries = 0
             method = _sessionMethods.get(type)
             send = (lambda url, **kwargs: _session.request(method, url, **kwargs)) \
                 if method else type
-            while requestCode != 200 and retries < 10:
-                data = send(
-                    url,
-                    timeout=self._request_timeout_secs,
-                    headers=headers,
-                    json=jsonParams,
-                    params=params
-                )
-                requestCode = data.status_code
-                retries += 1
+            for attempt in range(retries + 1):
+                lastAttempt = attempt == retries
+                try:
+                    data = send(
+                        url,
+                        timeout=timeout or self._request_timeout_secs,
+                        headers=headers,
+                        json=jsonParams,
+                        params=params
+                    )
+                except requests.exceptions.ConnectionError as e:
+                    # Dropped/refused connections are usually transient.
+                    # Timeouts aren't retried: each one already waited a while.
+                    if lastAttempt or isinstance(e, requests.exceptions.Timeout):
+                        raise
+                    time.sleep(min(0.5 * 2 ** attempt, self._maxRetryDelaySecs))
+                    continue
+
+                if data.status_code == 200 or data.status_code not in self._retryStatusCodes or lastAttempt:
+                    break
+
+                delay = min(0.5 * 2 ** attempt, self._maxRetryDelaySecs)
+                retryAfter = data.headers.get("Retry-After")
+                if retryAfter:
+                    try:
+                        delay = min(float(retryAfter), self._maxRetryDelaySecs * 2)
+                    except ValueError:
+                        pass
+                logger.warning(
+                    f"start.gg {(jsonParams or {}).get('operationName', url)} returned {data.status_code}, retrying in {delay}s")
+                time.sleep(delay)
+
+            if data.status_code != 200:
+                logger.warning(
+                    f"start.gg {(jsonParams or {}).get('operationName', url)} returned {data.status_code}")
             data = orjson.loads(data.text)
             # GraphQL errors (e.g. the complexity cap) come back as a 200,
             # so they'd otherwise look like an empty result
@@ -225,14 +262,22 @@ class StartGGDataProvider(TournamentDataProvider):
 
         return phases
 
-    def _FetchPhaseGroupSeeds(self, id, progress_callback=None, cancel_event=None):
-        seeds = []
-        seedMap = None
-        progressionsOut = None
-        page = 1
-        totalPages = 1
+    def _FetchAllPages(self, fetchPage, totalPagesPath, cancel_event=None):
+        # Page 1 tells us how many pages there are; the rest are fetched in
+        # parallel instead of one after another. Results stay in page order.
+        first = fetchPage(1)
+        pages = [first]
+        totalPages = deep_get(first, totalPagesPath, 1) or 1
 
-        while page <= totalPages and (cancel_event is None or not cancel_event.is_set()):
+        if totalPages > 1 and (cancel_event is None or not cancel_event.is_set()):
+            # Keep the worker count low so start.gg doesn't start rate limiting us
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                pages.extend(executor.map(fetchPage, range(2, totalPages + 1)))
+
+        return pages
+
+    def _FetchPhaseGroupSeeds(self, id, progress_callback=None, cancel_event=None):
+        def fetchPage(page):
             seedsData = self.QueryRequests(
                 "https://www.start.gg/api/-/gql",
                 type=requests.post,
@@ -255,26 +300,24 @@ class StartGGDataProvider(TournamentDataProvider):
                 logger.warning(
                     f"TournamentPhaseGroupSeedsQuery returned no phaseGroup for id {id} (page {page}): {seedsData}")
 
-            if page == 1:
-                seedMap = deep_get(seedsData, "data.phaseGroup.seedMap.1")
-                progressionsOut = deep_get(
-                    seedsData, "data.phaseGroup.progressionsOut")
+            return seedsData
 
+        pages = self._FetchAllPages(
+            fetchPage, "data.phaseGroup.seeds.pageInfo.totalPages", cancel_event)
+
+        seeds = []
+        for seedsData in pages:
             seeds.extend(
-                deep_get(seedsData, "data.phaseGroup.seeds.nodes", []))
+                deep_get(seedsData, "data.phaseGroup.seeds.nodes", []) or [])
 
-            totalPages = deep_get(
-                seedsData, "data.phaseGroup.seeds.pageInfo.totalPages", 1)
-            page += 1
-
-        return {"seeds": seeds, "seedMap": seedMap, "progressionsOut": progressionsOut}
+        return {
+            "seeds": seeds,
+            "seedMap": deep_get(pages[0], "data.phaseGroup.seedMap.1"),
+            "progressionsOut": deep_get(pages[0], "data.phaseGroup.progressionsOut")
+        }
 
     def _FetchPhaseGroupSets(self, id, progress_callback=None, cancel_event=None):
-        sets = []
-        page = 1
-        totalPages = 1
-
-        while page <= totalPages and (cancel_event is None or not cancel_event.is_set()):
+        def fetchPage(page):
             setsData = self.QueryRequests(
                 "https://www.start.gg/api/-/gql",
                 type=requests.post,
@@ -283,7 +326,7 @@ class StartGGDataProvider(TournamentDataProvider):
                     "variables": {
                         "id": id,
                         "page": page,
-                        "perPage": 200
+                        "perPage": 100
                     },
                     "query": StartGGDataProvider.TournamentPhaseGroupSetsQuery
                 }
@@ -297,46 +340,52 @@ class StartGGDataProvider(TournamentDataProvider):
                 logger.warning(
                     f"TournamentPhaseGroupSetsQuery returned no phaseGroup for id {id} (page {page}): {setsData}")
 
-            sets.extend(
-                deep_get(setsData, "data.phaseGroup.sets.nodes", []))
+            return setsData
 
-            totalPages = deep_get(
-                setsData, "data.phaseGroup.sets.pageInfo.totalPages", 1)
-            page += 1
+        pages = self._FetchAllPages(
+            fetchPage, "data.phaseGroup.sets.pageInfo.totalPages", cancel_event)
+
+        sets = []
+        for setsData in pages:
+            sets.extend(
+                deep_get(setsData, "data.phaseGroup.sets.nodes", []) or [])
 
         return {"sets": sets}
 
     def _FetchOldPhaseGroupData(self, id, progress_callback=None, cancel_event=None):
+        # Legacy REST API, only used for "hasCustomWinnerByes". It's slow and
+        # not always up, so don't let it hold the whole bracket load hostage.
         return self.QueryRequests(
             f"https://api.smash.gg/phase_group/{id}",
-            type=requests.get
+            type=requests.get,
+            retries=0,
+            timeout=5
         )
 
     def GetTournamentPhaseGroup(self, id, progress_callback=None, cancel_event=None):
         finalData = {}
 
         try:
-            # Seeds, sets, and the legacy REST payload are independent of
-            # each other, so fetch them concurrently rather than one after
-            # another. Splitting the seeds/sets queries apart (to stay under
-            # StartGG's 1000-object GraphQL complexity cap) turned one
-            # request into several, and running them sequentially made the
-            # whole fetch noticeably slower than the old single-request
-            # version.
-            fetchSeeds = Worker(self._FetchPhaseGroupSeeds, **{"id": id})
-            fetchSets = Worker(self._FetchPhaseGroupSets, **{"id": id})
-            fetchOld = Worker(self._FetchOldPhaseGroupData, **{"id": id})
+            # Seeds and sets are independent of each other, so fetch them
+            # concurrently rather than one after another. This runs on a
+            # worker of the shared thread pool, so use a separate executor:
+            # waiting on jobs queued behind us in the same pool could leave
+            # them stuck waiting for a free thread.
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                fetchSeeds = executor.submit(
+                    self._FetchPhaseGroupSeeds, id, cancel_event=cancel_event)
+                fetchSets = executor.submit(
+                    self._FetchPhaseGroupSets, id, cancel_event=cancel_event)
 
-            self.threadpool.start(fetchSeeds)
-            self.threadpool.start(fetchSets)
-            self.threadpool.start(fetchOld)
+                def result(future):
+                    try:
+                        return future.result()
+                    except Exception:
+                        logger.error(traceback.format_exc())
+                        return {}
 
-            Worker.wait_for_all(
-                [fetchSeeds, fetchSets, fetchOld], self._request_timeout_secs * 20)
-
-            seedsResult = fetchSeeds.result if fetchSeeds.completed else {}
-            setsResult = fetchSets.result if fetchSets.completed else {}
-            oldData = fetchOld.result if fetchOld.completed else {}
+                seedsResult = result(fetchSeeds)
+                setsResult = result(fetchSets)
 
             seeds = (seedsResult or {}).get("seeds", [])
             seedMap = (seedsResult or {}).get("seedMap")
@@ -368,6 +417,18 @@ class StartGGDataProvider(TournamentDataProvider):
                 teams.append(team)
 
             finalData["entrants"] = teams
+
+            graph = self._BuildBracketGraph(seeds, sets)
+            if graph is not None:
+                finalData["graph"] = graph
+                oldData = {}
+            else:
+                # Only the old bracket logic needs this, and it's slow
+                try:
+                    oldData = self._FetchOldPhaseGroupData(id) or {}
+                except Exception:
+                    logger.error(traceback.format_exc())
+                    oldData = {}
 
             # Preview IDs cannot be sorted normally
             # They follow the format: preview_2004442_1_5
@@ -452,6 +513,69 @@ class StartGGDataProvider(TournamentDataProvider):
             logger.error(traceback.format_exc())
 
         return finalData
+
+    @staticmethod
+    def _BuildBracketGraph(seeds, sets):
+        # The phase group's sets and how they connect (Bracket.FromGraph), so
+        # the bracket is drawn exactly as start.gg has it instead of being
+        # rebuilt from the number of entrants. Returns None if it can't be
+        # used, in which case the old bracket logic is used.
+        try:
+            # Entrant index (1-based, by seed) the bracket's player ids use
+            seedIndex = {}
+            entrantIndex = {}
+            for i, seed in enumerate(seeds):
+                if seed.get("id") is not None:
+                    seedIndex[str(seed.get("id"))] = i + 1
+                entrantId = deep_get(seed, "entrant.id")
+                if entrantId is not None:
+                    entrantIndex[str(entrantId)] = i + 1
+
+            graphSets = []
+            for s in sets:
+                slots = []
+                winnerSlot = None
+
+                for slotIndex, slot in enumerate(s.get("slots") or []):
+                    seedId = deep_get(slot, "seed.id")
+                    entrantId = deep_get(slot, "entrant.id")
+
+                    player = seedIndex.get(str(seedId)) if seedId is not None else None
+                    if player is None and entrantId is not None:
+                        player = entrantIndex.get(str(entrantId))
+
+                    if entrantId is not None and s.get("winnerId") is not None and \
+                            str(entrantId) == str(s.get("winnerId")):
+                        winnerSlot = slotIndex
+
+                    slots.append({
+                        "prereqType": slot.get("prereqType"),
+                        "prereqId": str(slot.get("prereqId")) if slot.get("prereqId") is not None else None,
+                        "placement": slot.get("prereqPlacement"),
+                        "player": player,
+                    })
+
+                graphSets.append({
+                    "id": str(s.get("id")),
+                    "round": int(s.get("round") or 0),
+                    "identifier": s.get("identifier"),
+                    "name": s.get("fullRoundText"),
+                    "score": [s.get("entrant1Score"), s.get("entrant2Score")],
+                    "finished": s.get("state", 0) == 3,
+                    "winnerSlot": winnerSlot,
+                    "slots": slots,
+                })
+
+            graph = {"sets": graphSets}
+
+            # Make sure it's usable before the UI relies on it
+            Bracket.FromGraph(graph, len(seeds))
+
+            return graph
+        except Exception:
+            logger.error("Couldn't build the bracket from start.gg's sets; using the old bracket logic")
+            logger.error(traceback.format_exc())
+            return None
 
     def GetMatch(self, setId, progress_callback=None, cancel_event=None):
         finalResult = None
@@ -1969,11 +2093,18 @@ class StartGGDataProvider(TournamentDataProvider):
 
             found = []
             for slug, player in todo:
+                # Players a bulk load is waiting on go first; both loops
+                # share the same request budget
+                while self._mainsQueue:
+                    time.sleep(self._prewarm_interval_secs)
+
                 # Stop if the user switched tournament or game meanwhile
                 if getattr(self.tshTdp, "provider", self) is not self:
                     break
                 if (TSHGameAssetManager.instance.selectedGame or {}).get("smashgg_game_id") != videogameId:
                     break
+                if (slug, videogameId) in self._mains_cache:
+                    continue
 
                 mains = self._FetchUserMains(slug, videogameId)
                 if mains is not None:
@@ -2112,7 +2243,7 @@ class StartGGDataProvider(TournamentDataProvider):
 
         return (playerData)
 
-    def EnrichPlayerData(self, playerData):
+    def EnrichPlayerData(self, playerData, blocking=True):
         # Lazy mains fill for entrants loaded via GetTournamentPhaseGroup.
         # That query no longer embeds the per-entrant sets->games->selections
         # lookup (it single-handedly pushed StartGG's GraphQL complexity
@@ -2131,6 +2262,9 @@ class StartGGDataProvider(TournamentDataProvider):
         key = (slug, videogameId)
         if key in self._mains_cache:
             mains = self._mains_cache[key]
+        elif not blocking:
+            self._QueueMainsFetch(playerData, videogameId)
+            return playerData
         else:
             mains = self._FetchUserMains(slug, videogameId)
             # A failed lookup isn't cached, so it gets retried next load
@@ -2139,6 +2273,88 @@ class StartGGDataProvider(TournamentDataProvider):
         if mains:
             playerData["mains"] = mains
         return playerData
+
+    def GetCachedMains(self, playerData):
+        slug = (playerData or {}).get("startgg_user_slug")
+        videogameId = (TSHGameAssetManager.instance.selectedGame or {}).get(
+            "smashgg_game_id")
+        if not slug or not videogameId:
+            return None
+        return self._mains_cache.get((slug, videogameId))
+
+    def _QueueMainsFetch(self, player, videogameId):
+        slug = player.get("startgg_user_slug")
+        key = (slug, videogameId)
+
+        # Players that already have mains saved for this game don't need them
+        gameCodename = (TSHGameAssetManager.instance.selectedGame or {}).get("codename")
+        tag = player.get("prefix")+" "+player.get("gamerTag") \
+            if player.get("prefix") else player.get("gamerTag")
+        try:
+            dbMains = (TSHPlayerDB.database.get(tag) or {}).get("mains") or {}
+            if isinstance(dbMains, str):
+                dbMains = orjson.loads(dbMains)
+            if gameCodename and dbMains.get(gameCodename):
+                return
+        except Exception:
+            pass
+
+        with self._mainsQueueLock:
+            if key in self._mainsQueued:
+                return
+            self._mainsQueued.add(key)
+            self._mainsQueue.append((key, {
+                "prefix": player.get("prefix"),
+                "gamerTag": player.get("gamerTag"),
+            }))
+
+            if self._mainsQueueThread is None:
+                self._mainsQueueThread = threading.Thread(
+                    target=self._MainsQueueWorker,
+                    name="StartGGMainsQueue", daemon=True
+                )
+                self._mainsQueueThread.start()
+
+    def _MainsQueueWorker(self):
+        found = []
+        fetched = 0
+        while True:
+            with self._mainsQueueLock:
+                if not self._mainsQueue:
+                    self._mainsQueueThread = None
+                    break
+                key, player = self._mainsQueue.popleft()
+
+            try:
+                slug, videogameId = key
+                if key not in self._mains_cache:
+                    mains = self._FetchUserMains(slug, videogameId)
+                    if mains is not None:
+                        self._mains_cache[key] = mains
+                    if mains:
+                        found.append({
+                            "prefix": player.get("prefix"),
+                            "gamerTag": player.get("gamerTag"),
+                            "mains": {g: [list(m) for m in ms] for g, ms in mains.items()},
+                        })
+                    fetched += 1
+                    time.sleep(self._prewarm_interval_secs)
+            except Exception:
+                logger.error(traceback.format_exc())
+            finally:
+                with self._mainsQueueLock:
+                    self._mainsQueued.discard(key)
+
+            # Let whoever is waiting on these pick them up in batches
+            if fetched >= 8 or not self._mainsQueue:
+                fetched = 0
+                try:
+                    if found:
+                        TSHPlayerDB.AddPlayers(found)
+                        found = []
+                    self.tshTdp.signals.player_mains_updated.emit()
+                except Exception:
+                    logger.error(traceback.format_exc())
 
     def GetUserMains(self, slug, videogameId):
         # Per-user mains lookup (no other code path fetches mains for a
