@@ -402,6 +402,11 @@ class Window(QMainWindow):
 
         self.dockWidgets = []
 
+        # Thumbnails can also be generated from the web server, so the
+        # bundled fonts can't rely on the thumbnail widget being enabled
+        from .thumbnail.main_generate_thumbnail import register_bundled_fonts
+        register_bundled_fonts()
+
         if not SettingsManager.Get("general.disable_thumbnail_widget", False):
             from .TSHThumbnailSettingsWidget import TSHThumbnailSettingsWidget
             thumbnailSetting = TSHThumbnailSettingsWidget()

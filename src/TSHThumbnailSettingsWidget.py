@@ -449,32 +449,14 @@ class TSHThumbnailSettingsWidget(QDockWidget):
             QPushButton, "btGenerate")
         self.generateThumbnail.setHidden(True)
 
-        # Load OpenSans
-        QFontDatabase.addApplicationFont(
-            "./assets/font/OpenSans/OpenSans-Bold.ttf")
-        QFontDatabase.addApplicationFont(
-            "./assets/font/OpenSans/OpenSans-Semibold.ttf")
-
-        unloadable, self.family_to_path = self.getFontPaths()
-        # add Open Sans
-        self.family_to_path["Open Sans"] = [
-            './assets/font/OpenSans/OpenSans-Bold.ttf',
-            './assets/font/OpenSans/OpenSans-Semibold.ttf'
-        ]
-
-        # Load Roboto Condensed
-        QFontDatabase.addApplicationFont(
-            "./assets/font/RobotoCondensed.ttf")
-
-        self.family_to_path["Roboto Condensed"] = [
-            './assets/font/RobotoCondensed.ttf',
-            './assets/font/RobotoCondensed.ttf'
-        ]
-
-        # add all fonts available
-        for k, v in sorted(self.family_to_path.items()):
-            self.selectFontPlayer.addItem(k, v)
-            self.selectFontPhase.addItem(k, v)
+        # Thumbnails pick fonts by family name, so Qt's own list of
+        # installed families is all the dropdowns need. This used to walk
+        # every system font file and load each one, which was most of this
+        # widget's startup cost.
+        thumbnail.register_bundled_fonts()
+        for family in self.getFontFamilies():
+            self.selectFontPlayer.addItem(family, family)
+            self.selectFontPhase.addItem(family, family)
 
         # listener
         self.selectFontPlayer.currentIndexChanged.connect(
@@ -507,6 +489,11 @@ class TSHThumbnailSettingsWidget(QDockWidget):
             self.GeneratePreview()
         ])
 
+        # Automatic previews are skipped while the dock is hidden (it starts
+        # tabbed behind the scoreboard) and rendered once it's shown
+        self.previewOutdated = True
+        self.visibilityChanged.connect(self.OnVisibilityChanged)
+
         self.selectRenderType.currentIndexChanged.connect(lambda: [
             SettingsManager.Set(
                 f"thumbnail_config.game.{TSHGameAssetManager.instance.selectedGame.get('codename')}.asset_pack",
@@ -516,24 +503,16 @@ class TSHThumbnailSettingsWidget(QDockWidget):
             self.GeneratePreview()
         ])
 
-        self.GeneratePreview()
-
         tmp_path = TSHResolve("tmp/thumbnail")
-        tmp_file = f"{tmp_path}/template.jpg"
         Path(tmp_path).mkdir(parents=True, exist_ok=True)
 
-        # if preview not there
-        if not os.path.isfile(tmp_file):
+        # Show the last rendered preview until a fresh one is generated
+        tmp_file = f"{tmp_path}/template.png"
+        if os.path.isfile(tmp_file):
             try:
-                tmp_file = thumbnail.generate(
-                    isPreview=True, settingsManager=SettingsManager, gameAssetManager=TSHGameAssetManager)
-            except Exception as e:
-                self.DisplayErrorMessage(traceback.format_exc())
-
-        try:
-            self.preview.setPixmap(QPixmap(tmp_file))
-        except:
-            logger.error(traceback.format_exc())
+                self.preview.setPixmap(QPixmap(tmp_file))
+            except:
+                logger.error(traceback.format_exc())
 
         self.updateFromSettings()
 
@@ -556,7 +535,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
         # Thumbnail type
         try:
             for i, t in enumerate(self.templates):
-                if t.get("filename") == self.GetSetting("thumbnail_type", "./assets/thumbnail_base/thumbnail_types/type_a.json"):
+                if t.get("filename") == self.GetSetting("thumbnail_type", thumbnail.DEFAULT_THUMBNAIL_TYPE):
                     self.templateSelect.blockSignals(True)
                     self.templateSelect.setCurrentIndex(i)
                     self.templateSelect.blockSignals(False)
@@ -850,47 +829,23 @@ class TSHThumbnailSettingsWidget(QDockWidget):
         for i in range(len(types)):
             cbType.addItem(types_localised[i], types[i])
 
-    def getFontPaths(self):
-        font_paths = QStandardPaths.standardLocations(
-            QStandardPaths.FontsLocation)
-        if sys.platform == "win32":
-            font_paths.append(
-                f"{os.getenv('LOCALAPPDATA')}\\Microsoft\\Windows\\Fonts")
+    def getFontFamilies(self):
+        return sorted(
+            f for f in QFontDatabase.families()
+            if not QFontDatabase.isPrivateFamily(f)
+        )
 
-        unloadable = []
-        family_to_path = {}
-
-        db = QFontDatabase
-        for fpath in font_paths:  # go through all font paths
-            if os.path.exists(fpath):
-                # go through all files at each path
-                for root, dirs, files in os.walk(fpath):
-                    for file in files:
-                        path = os.path.join(root, file)
-
-                        idx = db.addApplicationFont(path)  # add font path
-
-                        if idx < 0:
-                            # font wasn't loaded if idx is -1
-                            unloadable.append(path)
-                        else:
-                            names = db.applicationFontFamilies(
-                                idx)  # load back font family name
-
-                            for n in names:
-                                if n in family_to_path:
-                                    family_to_path[n].append(path)
-                                else:
-                                    family_to_path[n] = [path]
-                            # this isn't a 1:1 mapping, for example
-                            # 'C:/Windows/Fonts/HTOWERT.TTF' (regular) and
-                            # 'C:/Windows/Fonts/HTOWERTI.TTF' (italic) are different
-                            # but applicationFontFamilies will return 'High Tower Text' for both
-        return unloadable, family_to_path
+    def OnVisibilityChanged(self, visible):
+        if visible and self.previewOutdated:
+            self.GeneratePreview()
 
     # re-generate preview
     def GeneratePreview(self, manual=False):
-        SettingsManager.LoadSettings()
+        if not manual and not self.isVisible():
+            self.previewOutdated = True
+            return
+        self.previewOutdated = False
+
         self.updateFromSettings()
 
         if not manual:
@@ -966,27 +921,12 @@ class TSHThumbnailSettingsWidget(QDockWidget):
 
             # If there's no asset_pack config for this game
             if not SettingsManager.Get(f"thumbnail_config.game.{game.get('codename')}.asset_pack"):
-                # If there are any assets available
+                # If there are any assets available, pick the pack with
+                # the biggest images
                 if len(list(asset_dict.keys())) > 0:
-                    # Pick the pack with the biggest images
-                    biggest_pack = list(game.get("assets").values())[0]
-                    biggest_pack_key = list(game.get("assets").keys())[0]
-
-                    for key, val in game.get("assets").items():
-                        if val.get("average_size") and biggest_pack.get("average_size"):
-                            val_size = val.get("average_size").get(
-                                "x") * val.get("average_size").get("y")
-                            biggest_pack_size = biggest_pack.get("average_size").get(
-                                "x") * biggest_pack.get("average_size").get("y")
-
-                            if val_size > biggest_pack_size:
-                                biggest_pack = val
-                                biggest_pack_key = key
-                        elif val.get("average_size") and not biggest_pack.get("average_size"):
-                            biggest_pack = val
-
                     self.SaveSettings(
-                        f"game.{game.get('codename')}.asset_pack", biggest_pack_key)
+                        f"game.{game.get('codename')}.asset_pack",
+                        thumbnail.default_asset_pack(game))
 
             # Find pack in combobox, select it
             index = self.selectRenderType.findText(asset_dict.get(SettingsManager.Get(
