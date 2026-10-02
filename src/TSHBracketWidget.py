@@ -53,12 +53,18 @@ class TSHBracketWidget(QDockWidget):
         self.loadedEntrants = []
         self.mainsAppliedSlots = set()
 
+        # Phase group the bracket was loaded from, so its sets can be
+        # refreshed without reloading everything
+        self.loadedPhaseGroupId = None
+
         TSHTournamentDataProvider.instance.signals.tournament_phases_updated.connect(
             self.UpdatePhases)
         TSHTournamentDataProvider.instance.signals.tournament_phasegroup_updated.connect(
             self.UpdatePhaseGroup)
         TSHTournamentDataProvider.instance.signals.player_mains_updated.connect(
             self.ApplyFetchedMains)
+        TSHTournamentDataProvider.instance.signals.tournament_phasegroup_sets_updated.connect(
+            self.ApplySetsUpdate)
 
         self.signals = TSHBracketWidgetSignals()
 
@@ -93,6 +99,8 @@ class TSHBracketWidget(QDockWidget):
         self.slotNumber.valueChanged.connect(lambda val: [
             self.playerList.SetSlotNumber(val),
             self.RebuildBracket(val),
+            # No longer the loaded phase group's bracket
+            setattr(self, "loadedPhaseGroupId", None),
         ])
         row.layout().addWidget(col)
 
@@ -140,8 +148,23 @@ class TSHBracketWidget(QDockWidget):
             QPushButton, "btRefreshPhaseGroup")
         updateIcon = QImage("./assets/icons/undo.svg").scaled(24, 24)
         self.btRefreshPhaseGroup.setIcon(QIcon(QPixmap.fromImage(updateIcon)))
+        self.btRefreshPhaseGroup.setToolTip(QApplication.translate(
+            "app", "Reload the whole phase group, including its players"))
         self.btRefreshPhaseGroup.clicked.connect(self.PhaseGroupChanged)
         TSHHotkeys.signals.refresh_phase_group.connect(self.PhaseGroupChanged)
+
+        # Pulls only the results of the loaded bracket's sets, leaving the
+        # player list alone
+        self.btRefreshSets = QPushButton(
+            QApplication.translate("app", "Update sets"))
+        self.btRefreshSets.setToolTip(QApplication.translate(
+            "app", "Update only the set results of the loaded bracket, without reloading its players"))
+        self.btRefreshSets.setSizePolicy(
+            QSizePolicy.Maximum, QSizePolicy.Fixed)
+        self.btRefreshSets.clicked.connect(self.RefreshSets)
+        phaseGroupLayout: QHBoxLayout = self.findChild(
+            QHBoxLayout, "horizontalLayout_2")
+        phaseGroupLayout.addWidget(self.btRefreshSets)
 
         self.progressionsIn: QSpinBox = self.findChild(
             QSpinBox, "progressionsIn")
@@ -304,6 +327,111 @@ class TSHBracketWidget(QDockWidget):
             TSHTournamentDataProvider.instance.GetTournamentPhaseGroup(
                 self.phaseGroupSelection.currentData().get("id"))
 
+    def RefreshSets(self):
+        selected = self.phaseGroupSelection.currentData()
+        if selected is None or selected.get("id") is None:
+            return
+
+        # Nothing of this phase group loaded yet, so there's nothing to
+        # update: load all of it
+        if self.loadedPhaseGroupId is None or str(self.loadedPhaseGroupId) != str(selected.get("id")):
+            self.PhaseGroupChanged()
+            return
+
+        self.btRefreshSets.setEnabled(False)
+        TSHTournamentDataProvider.instance.GetTournamentPhaseGroupSets(
+            self.loadedPhaseGroupId,
+            graph=self.bracket.isGraph,
+            onFinished=lambda: self.btRefreshSets.setEnabled(True)
+        )
+
+    def ApplySetsUpdate(self, update):
+        # A different phase group was loaded meanwhile, or one is being loaded
+        if self.loadedPhaseGroupId is None or \
+                str(update.get("phaseGroupId")) != str(self.loadedPhaseGroupId):
+            return
+        if self.updatingPhaseGroup:
+            return
+
+        data = update.get("data") or {}
+
+        try:
+            with StateManager.SaveBlock():
+                if self.bracket.isGraph:
+                    if not self.ApplyGraphSetsUpdate(data):
+                        return
+                else:
+                    sets = data.get("sets") or {}
+                    if not sets:
+                        logger.warning(
+                            "Got no sets for the phase group; bracket left as is")
+                        return
+                    self.ApplySetScores(sets)
+
+                self.bracketView.Update()
+        except:
+            logger.error(traceback.format_exc())
+
+    def ApplyGraphSetsUpdate(self, data):
+        updates = {}
+        for s in (data.get("graph") or {}).get("sets") or []:
+            if s.get("id") is not None:
+                updates[str(s.get("id"))] = s
+
+        if not updates:
+            logger.warning(
+                "Got no sets for the phase group; bracket left as is")
+            return False
+
+        bracketSets = {
+            str(_set.id): _set
+            for round in self.bracket.rounds.values()
+            for _set in round
+            if _set.id is not None
+        }
+
+        # Sets the bracket doesn't have (e.g. a preview bracket that has been
+        # started since, which gives every set a new id) mean the bracket
+        # itself changed, so it has to be loaded again
+        if any(id not in bracketSets for id in updates):
+            logger.info(
+                "The phase group's sets changed since it was loaded; reloading it")
+            self.PhaseGroupChanged()
+            return False
+
+        missing = len(bracketSets) - len(updates)
+        if missing > 0:
+            logger.warning(
+                f"Got {len(updates)} of {len(bracketSets)} sets; only updating those")
+
+        for id, s in updates.items():
+            _set = bracketSets[id]
+            score = list(s.get("score") or [None, None])[:2]
+            score += [None] * (2 - len(score))
+            _set.score = [v if v is not None else 0 for v in score]
+            _set.finished = bool(s.get("finished"))
+            _set.winnerSlot = s.get("winnerSlot")
+
+        return True
+
+    def ApplySetScores(self, sets):
+        for r, round in sets.items():
+            for s, _set in enumerate(round):
+                try:
+                    score = _set.get("score")
+                    if score[0] == None:
+                        score[0] = 0
+                    if score[1] == None:
+                        score[1] = 0
+
+                    roundIndex = str(r)
+
+                    self.bracket.rounds[roundIndex][s].score = score
+                    self.bracket.rounds[roundIndex][s].finished = _set.get(
+                        "finished")
+                except Exception as e:
+                    logger.error(traceback.format_exc())
+
     def RebuildBracket(self, playerNumber, seedMap=None, customSeeding=False):
         self.bracket = Bracket(playerNumber, self.progressionsIn.value(
         ), seedMap, self.winnersOnly.isChecked(), progressionsOut=self.progressionsOut.value())
@@ -439,22 +567,9 @@ class TSHBracketWidget(QDockWidget):
                     phaseGroupData.get("customSeeding", False)
                 )
 
-            for r, round in sets.items():
-                for s, _set in enumerate(round):
-                    try:
-                        score = _set.get("score")
-                        if score[0] == None:
-                            score[0] = 0
-                        if score[1] == None:
-                            score[1] = 0
+            self.ApplySetScores(sets)
 
-                        roundIndex = str(r)
-
-                        self.bracket.rounds[roundIndex][s].score = score
-                        self.bracket.rounds[roundIndex][s].finished = _set.get(
-                            "finished")
-                    except Exception as e:
-                        logger.error(traceback.format_exc())
+            self.loadedPhaseGroupId = phaseGroupData.get("phaseGroupId")
 
             self.bracketView.Update()
         except:

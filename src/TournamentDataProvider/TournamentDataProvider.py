@@ -74,6 +74,14 @@ class TournamentDataProvider(QObject):
     def GetTournamentPhaseGroup(self, id, progress_callback=None, cancel_event=None):
         pass
 
+    def GetTournamentPhaseGroupSets(self, id, graph=False, progress_callback=None, cancel_event=None):
+        # Just the set results of a phase group, to refresh an already loaded
+        # bracket without reloading its entrants. Returns {"graph": {"sets":
+        # [{"id", "score", "finished", "winnerSlot"}, ...]}} when graph is
+        # True and the provider can, else the same "sets" as
+        # GetTournamentPhaseGroup. By default that's all it can do.
+        return self.GetTournamentPhaseGroup(id, progress_callback=progress_callback, cancel_event=cancel_event)
+
     def GetStandings(self, playerNumber):
         pass
 

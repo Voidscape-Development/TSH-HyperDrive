@@ -556,6 +556,39 @@ class StartGGDataProvider(TournamentDataProvider):
 
         return finalData
 
+    def GetTournamentPhaseGroupSets(self, id, graph=False, progress_callback=None, cancel_event=None):
+        if not graph:
+            # The old bracket logic needs everything GetTournamentPhaseGroup
+            # does to place the sets
+            return self.GetTournamentPhaseGroup(id, progress_callback=progress_callback, cancel_event=cancel_event)
+
+        # A bracket built from the graph already knows how its sets connect
+        # and who is seeded where, so the sets' results are all it needs
+        try:
+            sets = (self._FetchPhaseGroupSets(
+                id, cancel_event=cancel_event) or {}).get("sets", [])
+
+            return {"graph": {"sets": [{
+                "id": str(s.get("id")),
+                "score": [s.get("entrant1Score"), s.get("entrant2Score")],
+                "finished": s.get("state", 0) == 3,
+                "winnerSlot": StartGGDataProvider._SetWinnerSlot(s),
+            } for s in sets]}}
+        except Exception:
+            logger.error(traceback.format_exc())
+            return {}
+
+    @staticmethod
+    def _SetWinnerSlot(s):
+        # Slot of the set's winner, if start.gg has one
+        if s.get("winnerId") is None:
+            return None
+        for slotIndex, slot in enumerate(s.get("slots") or []):
+            entrantId = deep_get(slot, "entrant.id")
+            if entrantId is not None and str(entrantId) == str(s.get("winnerId")):
+                return slotIndex
+        return None
+
     @staticmethod
     def _BuildBracketGraph(seeds, sets):
         # The phase group's sets and how they connect (Bracket.FromGraph), so
@@ -576,7 +609,6 @@ class StartGGDataProvider(TournamentDataProvider):
             graphSets = []
             for s in sets:
                 slots = []
-                winnerSlot = None
 
                 for slotIndex, slot in enumerate(s.get("slots") or []):
                     seedId = deep_get(slot, "seed.id")
@@ -588,10 +620,6 @@ class StartGGDataProvider(TournamentDataProvider):
                     player = seedIndex.get(str(seedId)) if seedId is not None else None
                     if player is None and entrantId is not None:
                         player = entrantIndex.get(str(entrantId))
-
-                    if entrantId is not None and s.get("winnerId") is not None and \
-                            str(entrantId) == str(s.get("winnerId")):
-                        winnerSlot = slotIndex
 
                     slots.append({
                         "prereqType": slot.get("prereqType"),
@@ -607,7 +635,7 @@ class StartGGDataProvider(TournamentDataProvider):
                     "name": s.get("fullRoundText"),
                     "score": [s.get("entrant1Score"), s.get("entrant2Score")],
                     "finished": s.get("state", 0) == 3,
-                    "winnerSlot": winnerSlot,
+                    "winnerSlot": StartGGDataProvider._SetWinnerSlot(s),
                     "slots": slots,
                 })
 
