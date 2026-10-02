@@ -1102,8 +1102,8 @@ p, li { white-space: pre-wrap; }
         <location filename="../TSHAssetDownloader.py" line="335"/>
         <location filename="../TSHAssetDownloader.py" line="543"/>
         <location filename="../TournamentStreamHelper.py" line="1214"/>
-        <location filename="../TSHTournamentDataProvider.py" line="229"/>
-        <location filename="../TSHTournamentDataProvider.py" line="253"/>
+        <location filename="../TSHTournamentDataProvider.py" line="231"/>
+        <location filename="../TSHTournamentDataProvider.py" line="255"/>
         <location filename="../Helpers/TSHDownloadHelper.py" line="210"/>
         <source>Cancel</source>
         <translation>取消</translation>
@@ -1235,13 +1235,13 @@ p, li { white-space: pre-wrap; }
         <translation>下载失败：</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="83"/>
+        <location filename="../TSHBracketWidget.py" line="90"/>
         <location filename="../TSHPlayerListWidget.py" line="57"/>
         <source>Number of slots</source>
         <translation>选手/队伍数量</translation>
     </message>
     <message>
-        <location filename="../TSHBracketWidget.py" line="94"/>
+        <location filename="../TSHBracketWidget.py" line="101"/>
         <location filename="../TSHPlayerListWidget.py" line="66"/>
         <source>Players per slot</source>
         <translation>每个队伍的选手数量</translation>
@@ -1249,7 +1249,7 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../TSHCommentaryWidget.py" line="52"/>
         <location filename="../TSHScoreboardWidget.py" line="172"/>
-        <location filename="../TSHBracketWidget.py" line="103"/>
+        <location filename="../TSHBracketWidget.py" line="110"/>
         <location filename="../TSHPlayerListWidget.py" line="75"/>
         <source>Characters per player</source>
         <translation>每位选手使用的角色数量</translation>
@@ -1293,7 +1293,7 @@ p, li { white-space: pre-wrap; }
     </message>
     <message>
         <location filename="../TSHScoreboardPlayerWidget.py" line="87"/>
-        <location filename="../TSHScoreboardPlayerWidget.py" line="1026"/>
+        <location filename="../TSHScoreboardPlayerWidget.py" line="1031"/>
         <source>Save new player</source>
         <translation>保存选手信息</translation>
     </message>
@@ -1317,7 +1317,7 @@ p, li { white-space: pre-wrap; }
         <translation>选手{0}</translation>
     </message>
     <message>
-        <location filename="../TSHScoreboardPlayerWidget.py" line="1023"/>
+        <location filename="../TSHScoreboardPlayerWidget.py" line="1028"/>
         <source>Update player</source>
         <translation>更新选手信息</translation>
     </message>
@@ -1657,7 +1657,7 @@ p, li { white-space: pre-wrap; }
     <message>
         <location filename="../TSHTournamentInfoWidget.py" line="147"/>
         <location filename="../TSHTournamentInfoWidget.py" line="148"/>
-        <location filename="../TSHTournamentDataProvider.py" line="91"/>
+        <location filename="../TSHTournamentDataProvider.py" line="93"/>
         <source>Error</source>
         <translation>错误</translation>
     </message>
@@ -1683,69 +1683,69 @@ p, li { white-space: pre-wrap; }
         <translation>队伍 {0}</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="94"/>
+        <location filename="../TSHTournamentDataProvider.py" line="96"/>
         <source>Parry.gg API key has not been set. Please configure it in Settings &gt; API Keys.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="95"/>
+        <location filename="../TSHTournamentDataProvider.py" line="97"/>
         <source>API keys can be created at: </source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="165"/>
+        <location filename="../TSHTournamentDataProvider.py" line="167"/>
         <source>Paste the tournament URL.</source>
         <translation>请粘贴赛事链接</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="165"/>
+        <location filename="../TSHTournamentDataProvider.py" line="167"/>
         <source>For StartGG, the link must contain the /event/ part</source>
         <translation>针对StartGG平台，链接必须包含/event/路径</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="165"/>
+        <location filename="../TSHTournamentDataProvider.py" line="167"/>
         <source>Supported providers:</source>
         <translation>支持的数据提供商</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="170"/>
-        <location filename="../TSHTournamentDataProvider.py" line="230"/>
-        <location filename="../TSHTournamentDataProvider.py" line="254"/>
+        <location filename="../TSHTournamentDataProvider.py" line="172"/>
+        <location filename="../TSHTournamentDataProvider.py" line="232"/>
+        <location filename="../TSHTournamentDataProvider.py" line="256"/>
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="194"/>
+        <location filename="../TSHTournamentDataProvider.py" line="196"/>
         <source>Set tournament URL</source>
         <translation>设置赛事链接</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="227"/>
+        <location filename="../TSHTournamentDataProvider.py" line="229"/>
         <source>Set Twitch username</source>
         <translation>设置Twitch用户名</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="228"/>
+        <location filename="../TSHTournamentDataProvider.py" line="230"/>
         <source>Twitch Username:</source>
         <translation>Twitch用户名</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="239"/>
+        <location filename="../TSHTournamentDataProvider.py" line="241"/>
         <source>Paste the URL to the player&apos;s StartGG profile</source>
         <translation>请粘贴该选手的StartGG个人主页链接</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="243"/>
+        <location filename="../TSHTournamentDataProvider.py" line="245"/>
         <source>Paste the URL to the player&apos;s ParryGG profile</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="246"/>
+        <location filename="../TSHTournamentDataProvider.py" line="248"/>
         <source>Invalid tournament data provider</source>
         <translation>赛事数据提供商无效</translation>
     </message>
     <message>
-        <location filename="../TSHTournamentDataProvider.py" line="251"/>
+        <location filename="../TSHTournamentDataProvider.py" line="253"/>
         <source>Set player</source>
         <translation>设置选手</translation>
     </message>
