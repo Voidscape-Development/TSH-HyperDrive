@@ -7,7 +7,6 @@ from .Helpers.TSHDirHelper import TSHResolve
 import faulthandler
 import shutil
 import zipfile
-import qdarktheme
 import requests
 import json
 import orjson
@@ -38,6 +37,10 @@ QCoreApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
 
 if parse(qtpy.QT_VERSION).major == 6:
     QImageReader.setAllocationLimit(0)
+
+# The UI scale has to be set before the application is created
+from .TSHTheme import TSHTheme, ApplyUIScale
+ApplyUIScale()
 
 App = QApplication(sys.argv)
 TSHQtHelper.init_gui_executor()  # guaranteed to be the main thread.
@@ -333,7 +336,7 @@ class Window(QMainWindow):
     def SetupUi(self):
         TSHLocaleHelper.LoadLocale()
         TSHLocaleHelper.LoadRoundNames()
-        self.LoadTheme()
+        TSHTheme.Apply()
 
         self.signals = WindowSignals()
 
@@ -610,12 +613,6 @@ class Window(QMainWindow):
         action.setIcon(QIcon('assets/icons/download.svg'))
         action.triggered.connect(lambda: TSHAssetDownloader.instance.DownloadAssets(self))
         self.downloadAssetsAction = action
-
-        action = self.optionsBt.menu().addAction(
-            QApplication.translate("app", "Light mode"))
-        action.setCheckable(True)
-        action.setChecked(SettingsManager.Get("light_mode", False))
-        action.toggled.connect(self.ToggleLightMode)
 
         toggleWidgets = QMenu(QApplication.translate(
             "app", "Toggle widgets") + menu_margin, self.optionsBt.menu())
@@ -1269,20 +1266,6 @@ class Window(QMainWindow):
         else:
             self.setWindowFlag(Qt.WindowStaysOnTopHint, False)
         self.show()
-
-    def ToggleLightMode(self, checked):
-        if checked:
-            qdarktheme.setup_theme("light")
-        else:
-            qdarktheme.setup_theme()
-
-        SettingsManager.Set("light_mode", checked)
-
-    def LoadTheme(self):
-        if SettingsManager.Get("light_mode", False):
-            qdarktheme.setup_theme("light")
-        else:
-            qdarktheme.setup_theme()
 
     def ToggleTopOption(self):
         if not SettingsManager.Get("general.hide_track_player", False):

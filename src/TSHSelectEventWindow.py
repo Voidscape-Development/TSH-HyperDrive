@@ -4,6 +4,7 @@ from qtpy.QtCore import *
 from loguru import logger
 
 from .TSHGameAssetManager import TSHGameAssetManager
+from .TSHTheme import TSHTheme, Blend
 from .TournamentDataProvider.TournamentEventLookup import (
     FetchTournamentEvents, TournamentLookupError,
     ERROR_NOT_FOUND, ERROR_NO_EVENTS, ERROR_PARRY_KEY,
@@ -42,38 +43,18 @@ def GameLogoPath(provider, gameId):
     return None
 
 
-def Blend(a, b, amount):
-    # a mixed with amount of b, so the card colors follow the light/dark theme
-    return QColor(
-        round(a.red() + (b.red() - a.red()) * amount),
-        round(a.green() + (b.green() - a.green()) * amount),
-        round(a.blue() + (b.blue() - a.blue()) * amount))
-
-
 def ThemeColors():
-    palette = QApplication.palette()
-    dark = palette.color(QPalette.ColorRole.Text).lightness() > 128
-    # The app's qdarktheme only sets part of the app palette (dark text on
-    # a white base), so take its full palette when it's there
-    try:
-        import qdarktheme
-        palette = qdarktheme.load_palette("dark" if dark else "light")
-    except Exception:
-        pass
-    text = palette.color(QPalette.ColorRole.Text)
-    window = palette.color(QPalette.ColorRole.Window)
-    highlight = palette.color(QPalette.ColorRole.Highlight)
-    card = Blend(window, text, 0.06) if dark else QColor("#ffffff")
+    theme = TSHTheme.Colors()
     return {
-        "text": text,
-        "window": window,
-        "card": card,
-        "tile": Blend(card, text, 0.08),
-        "border": Blend(card, text, 0.15),
-        "muted": Blend(text, card, 0.3),
-        "highlight": highlight,
-        "hover": Blend(card, highlight, 0.7),
-        "selected": Blend(card, highlight, 0.18),
+        "text": theme["text"],
+        "window": theme["window"],
+        "card": theme["surface"],
+        "tile": theme["raised"],
+        "border": theme["border"],
+        "muted": theme["muted"],
+        "highlight": theme["accent"],
+        "hover": Blend(theme["surface"], theme["accent"], 0.7),
+        "selected": theme["accentSoft"],
     }
 
 

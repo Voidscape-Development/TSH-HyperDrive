@@ -3,6 +3,9 @@ from qtpy.QtWidgets import *
 from .SettingsWidget import SettingsWidget
 from ..TSHHotkeys import TSHHotkeys
 from ..Helpers.TSHVersionHelper import add_beta_label, get_beta_status
+from ..TSHTheme import (
+    TSHTheme, DEFAULT_THEME, DEFAULT_ACCENT, DEFAULT_UI_SCALE, UI_SCALES,
+    THEME_DARK, THEME_LIGHT, THEME_SYSTEM)
 
 
 class TSHSettingsWindow(QDialog):
@@ -169,6 +172,45 @@ class TSHSettingsWindow(QDialog):
 
         self.add_setting_widget(QApplication.translate(
             "settings", "General"), SettingsWidget("general", generalSettings))
+
+        # Add appearance settings
+        appearanceSettings = []
+
+        appearanceSettings.append((
+            QApplication.translate("settings.appearance", "Theme"),
+            "theme",
+            "combobox",
+            DEFAULT_THEME,
+            TSHTheme.Apply,
+            None,
+            [
+                (QApplication.translate("settings.appearance", "Dark"), THEME_DARK),
+                (QApplication.translate("settings.appearance", "Light"), THEME_LIGHT),
+                (QApplication.translate("settings.appearance", "Follow system"), THEME_SYSTEM),
+            ]
+        ))
+
+        appearanceSettings.append((
+            QApplication.translate("settings.appearance", "Accent color"),
+            "accent_color",
+            "color",
+            DEFAULT_ACCENT,
+            TSHTheme.Apply
+        ))
+
+        appearanceSettings.append((
+            QApplication.translate(
+                "settings.appearance", "UI scale (takes effect on next restart)"),
+            "ui_scale",
+            "combobox",
+            DEFAULT_UI_SCALE,
+            None,
+            None,
+            [(f"{scale}%", scale) for scale in UI_SCALES]
+        ))
+
+        self.add_setting_widget(QApplication.translate(
+            "settings", "Appearance"), SettingsWidget("appearance", appearanceSettings))
 
         # Add hotkey settings
         hotkeySettings = []

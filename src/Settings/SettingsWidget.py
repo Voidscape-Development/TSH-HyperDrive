@@ -20,7 +20,7 @@ class SettingsWidget(QWidget):
         for setting in settings:
             self.AddSetting(*setting)
 
-    def AddSetting(self, name: str, setting: str, type: str, defaultValue, callback=lambda: None, tooltip=None):
+    def AddSetting(self, name: str, setting: str, type: str, defaultValue, callback=lambda: None, tooltip=None, options=None):
         lastRow = self.layout().rowCount()
 
         self.layout().addWidget(QLabel(name), lastRow, 0)
@@ -90,12 +90,33 @@ class SettingsWidget(QWidget):
         elif type == "color":
             settingWidget = TSHColorButton(color=SettingsManager.Get(self.settingsBase+"."+setting, defaultValue), disable_right_click=True)
             settingWidget.colorChanged.connect(
-                lambda val=None: SettingsManager.Set(self.settingsBase+"."+setting, settingWidget.color()))
+                lambda val=None: [
+                    SettingsManager.Set(self.settingsBase+"."+setting, settingWidget.color()),
+                    self.CheckCallable(callback)
+                ])
             resetButton.clicked.connect(
                 lambda bt=None, setting=setting, settingWidget=settingWidget: [
                     settingWidget.setColor(defaultValue),
                     self.CheckCallable(callback)
                 ]
+            )
+        elif type == "combobox":
+            # options is a list of (label, value)
+            settingWidget = QComboBox()
+            for label, value in options or []:
+                settingWidget.addItem(label, value)
+            current = settingWidget.findData(SettingsManager.Get(
+                self.settingsBase+"."+setting, defaultValue))
+            settingWidget.setCurrentIndex(
+                current if current >= 0 else settingWidget.findData(defaultValue))
+            settingWidget.currentIndexChanged.connect(
+                lambda index=None, settingWidget=settingWidget: [
+                    SettingsManager.Set(self.settingsBase+"."+setting, settingWidget.currentData()),
+                    self.CheckCallable(callback)
+                ])
+            resetButton.clicked.connect(
+                lambda bt=None, settingWidget=settingWidget:
+                settingWidget.setCurrentIndex(settingWidget.findData(defaultValue))
             )
         
         if tooltip:
