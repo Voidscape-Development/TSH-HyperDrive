@@ -11,8 +11,10 @@ from .TournamentDataProvider.TournamentEventLookup import (
 )
 from .Workers import Worker
 
-ICON_SIZE = 48
+ICON_SIZE = 52
 LOCATION_ICON_SIZE = 22
+DETAIL_ICON_SIZE = 14
+STRIPE_WIDTH = 4
 LOCATION_ICONS = {
     "online": ["./assets/icons/online.svg"],
     "offline": ["./assets/icons/offline.svg"],
@@ -40,38 +42,121 @@ def GameLogoPath(provider, gameId):
     return None
 
 
+def Blend(a, b, amount):
+    # a mixed with amount of b, so the card colors follow the light/dark theme
+    return QColor(
+        round(a.red() + (b.red() - a.red()) * amount),
+        round(a.green() + (b.green() - a.green()) * amount),
+        round(a.blue() + (b.blue() - a.blue()) * amount))
+
+
+def ThemeColors():
+    palette = QApplication.palette()
+    dark = palette.color(QPalette.ColorRole.Text).lightness() > 128
+    # The app's qdarktheme only sets part of the app palette (dark text on
+    # a white base), so take its full palette when it's there
+    try:
+        import qdarktheme
+        palette = qdarktheme.load_palette("dark" if dark else "light")
+    except Exception:
+        pass
+    text = palette.color(QPalette.ColorRole.Text)
+    window = palette.color(QPalette.ColorRole.Window)
+    highlight = palette.color(QPalette.ColorRole.Highlight)
+    card = Blend(window, text, 0.06) if dark else QColor("#ffffff")
+    return {
+        "text": text,
+        "window": window,
+        "card": card,
+        "tile": Blend(card, text, 0.08),
+        "border": Blend(card, text, 0.15),
+        "muted": Blend(text, card, 0.3),
+        "highlight": highlight,
+        "hover": Blend(card, highlight, 0.7),
+        "selected": Blend(card, highlight, 0.18),
+    }
+
+
+def TintedIcon(path, color, size):
+    pixmap = QIcon(path).pixmap(size, size)
+    painter = QPainter(pixmap)
+    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+    painter.fillRect(pixmap.rect(), color)
+    painter.end()
+    return pixmap
+
+
+def StatusStyle(state):
+    # Label and color of each event state. Dark enough for white text.
+    if state == STATE_ACTIVE:
+        return QApplication.translate("app", "In progress"), QColor("#1e8449")
+    if state == STATE_COMPLETED:
+        return QApplication.translate("app", "Completed"), QColor("#6b7280")
+    return QApplication.translate("app", "Upcoming"), QColor("#2563eb")
+
+
+def Initials(name):
+    words = [w for w in (name or "").split() if w[:1].isalnum()]
+    return "".join(w[0] for w in words[:2]).upper() or "?"
+
+
 class TSHEventCard(QWidget):
     def __init__(self, provider, event, parent=None):
         super().__init__(parent)
+        colors = ThemeColors()
+        muted = colors["muted"]
+        statusText, self.statusColor = StatusStyle(event.get("state"))
+
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
+        # Room on the left for the status stripe
+        layout.setContentsMargins(STRIPE_WIDTH + 10, 8, 12, 8)
+        layout.setSpacing(12)
 
-        icon = QLabel()
-        icon.setFixedSize(ICON_SIZE, ICON_SIZE)
-        icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Game logo in a tile, or the game's initials when TSH doesn't have it
+        tile = QLabel()
+        tile.setFixedSize(ICON_SIZE, ICON_SIZE)
+        tile.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tile.setStyleSheet(
+            f"background: {colors['tile'].name()}; border-radius: 8px;"
+            f"color: {muted.name()}; font-weight: bold;")
         logoPath = GameLogoPath(provider, event.get("gameId"))
-        if logoPath:
-            pixmap = QPixmap(logoPath)
-            if not pixmap.isNull():
-                icon.setPixmap(pixmap.scaled(
-                    ICON_SIZE, ICON_SIZE,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation))
-        layout.addWidget(icon)
+        pixmap = QPixmap(logoPath) if logoPath else QPixmap()
+        if not pixmap.isNull():
+            tile.setPixmap(pixmap.scaled(
+                ICON_SIZE - 8, ICON_SIZE - 8,
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation))
+        else:
+            tile.setText(Initials(event.get("game")))
+        tile.setToolTip(event.get("game", ""))
+        layout.addWidget(tile)
 
-        text = QVBoxLayout()
-        text.setSpacing(2)
-        layout.addLayout(text, 1)
+        column = QVBoxLayout()
+        column.setSpacing(4)
+        layout.addLayout(column, 1)
 
         nameRow = QHBoxLayout()
-        text.addLayout(nameRow)
+        nameRow.setSpacing(6)
+        column.addLayout(nameRow)
 
         name = QLabel(event.get("name", ""))
+        name.setStyleSheet(f"color: {colors['text'].name()};")
         font = name.font()
         font.setBold(True)
         font.setPointSizeF(font.pointSizeF() * 1.15)
         name.setFont(font)
         nameRow.addWidget(name, 1)
+
+        pill = QLabel(statusText.upper())
+        pillFont = pill.font()
+        pillFont.setBold(True)
+        pillFont.setPointSizeF(pillFont.pointSizeF() * 0.8)
+        pillFont.setLetterSpacing(QFont.SpacingType.PercentageSpacing, 108)
+        pill.setFont(pillFont)
+        pill.setStyleSheet(
+            f"background: {self.statusColor.name()}; color: white;"
+            "border-radius: 9px; padding: 2px 8px;")
+        nameRow.addWidget(pill)
 
         # Online/offline as icons, so it reads at a glance
         location = event.get("location")
@@ -82,27 +167,40 @@ class TSHEventCard(QWidget):
             label.setToolTip(tooltip)
             nameRow.addWidget(label)
 
-        details = QLabel(" · ".join(self.Details(event)))
-        details.setWordWrap(True)
-        text.addWidget(details)
+        details = QHBoxLayout()
+        details.setSpacing(4)
+        column.addLayout(details)
 
-    @staticmethod
-    def Details(event):
-        details = []
+        def addDetail(iconPath, value):
+            if details.count() > 0:
+                details.addSpacing(10)
+            if iconPath:
+                icon = QLabel()
+                icon.setPixmap(TintedIcon(iconPath, muted, DETAIL_ICON_SIZE))
+                details.addWidget(icon)
+            label = QLabel(value)
+            label.setStyleSheet(f"color: {muted.name()};")
+            details.addWidget(label)
+
         if event.get("game"):
-            details.append(event.get("game"))
-        details.append(QApplication.translate(
+            addDetail(None, event.get("game"))
+        addDetail("./assets/icons/people.svg", QApplication.translate(
             "app", "{0} entrants").format(event.get("numEntrants", 0)))
         if event.get("startAt"):
             date = QDateTime.fromSecsSinceEpoch(int(event.get("startAt")))
-            details.append(QLocale().toString(date, QLocale.FormatType.ShortFormat))
-        if event.get("state") == STATE_ACTIVE:
-            details.append(QApplication.translate("app", "In progress"))
-        elif event.get("state") == STATE_COMPLETED:
-            details.append(QApplication.translate("app", "Completed"))
-        else:
-            details.append(QApplication.translate("app", "Upcoming"))
-        return details
+            addDetail("./assets/icons/calendar.svg",
+                      QLocale().toString(date, QLocale.FormatType.ShortFormat))
+        details.addStretch()
+
+    def paintEvent(self, event):
+        # Status stripe down the card's left edge
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(self.statusColor)
+        painter.drawRoundedRect(
+            QRectF(4, 8, STRIPE_WIDTH, self.height() - 16), STRIPE_WIDTH / 2, STRIPE_WIDTH / 2)
+        painter.end()
 
 
 class TSHSelectEventWindow(QDialog):
@@ -119,12 +217,20 @@ class TSHSelectEventWindow(QDialog):
         layout = QVBoxLayout()
         self.setLayout(layout)
 
+        colors = ThemeColors()
+
         self.header = QLabel(QApplication.translate("app", "Loading events..."))
         self.header.setWordWrap(True)
         font = self.header.font()
         font.setBold(True)
+        font.setPointSizeF(font.pointSizeF() * 1.4)
         self.header.setFont(font)
         layout.addWidget(self.header)
+
+        self.subheader = QLabel()
+        self.subheader.setStyleSheet(f"color: {colors['muted'].name()};")
+        self.subheader.hide()
+        layout.addWidget(self.subheader)
 
         self.searchBar = QLineEdit()
         self.searchBar.setPlaceholderText(QApplication.translate("app", "Filter..."))
@@ -135,6 +241,25 @@ class TSHSelectEventWindow(QDialog):
         self.eventList.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.eventList.itemDoubleClicked.connect(lambda item: self.LoadSelectedEvent())
         self.eventList.installEventFilter(self)
+        # Each event is a rounded box on the window's background
+        self.eventList.setSpacing(4)
+        self.eventList.setFrameShape(QFrame.Shape.NoFrame)
+        self.eventList.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.eventList.setStyleSheet(f"""
+            QListWidget {{ background: {colors['window'].name()}; outline: none; }}
+            QListWidget::item {{
+                background: {colors['card'].name()};
+                border: 1px solid {colors['border'].name()};
+                border-radius: 10px;
+            }}
+            QListWidget::item:hover {{
+                border: 1px solid {colors['hover'].name()};
+            }}
+            QListWidget::item:selected {{
+                background: {colors['selected'].name()};
+                border: 2px solid {colors['highlight'].name()};
+            }}
+        """)
         layout.addWidget(self.eventList)
 
         buttons = QDialogButtonBox(
@@ -165,6 +290,9 @@ class TSHSelectEventWindow(QDialog):
     def SetEvents(self, result):
         self.provider = result.get("provider")
         self.header.setText(result.get("tournamentName", ""))
+        self.subheader.setText(QApplication.translate(
+            "app", "{0} events").format(len(result.get("events", []))))
+        self.subheader.show()
         self.eventList.clear()
 
         for event in result.get("events", []):
