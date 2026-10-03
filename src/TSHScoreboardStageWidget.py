@@ -17,6 +17,7 @@ from .StateManager import StateManager
 from .TSHGameAssetManager import TSHGameAssetManager
 import socket
 from loguru import logger
+from .TSHTheme import ThemedIcon
 
 
 class TSHScoreboardStageWidgetSignals(QObject):
@@ -82,24 +83,24 @@ class TSHScoreboardStageWidget(QDockWidget):
         self.btAddNeutral = self.findChild(QPushButton, "btAddNeutral")
         self.btAddNeutral.clicked.connect(
             lambda x=None, view=self.stagesNeutral: self.AddStage(view))
-        self.btAddNeutral.setIcon(QIcon("./assets/icons/arrow_right.svg"))
+        self.btAddNeutral.setIcon(ThemedIcon("./assets/icons/arrow_right.svg"))
 
         self.btRemoveNeutral = self.findChild(QPushButton, "btRemoveNeutral")
         self.btRemoveNeutral.clicked.connect(
             lambda: self.RemoveStage(self.stagesNeutral))
-        self.btRemoveNeutral.setIcon(QIcon("./assets/icons/arrow_left.svg"))
+        self.btRemoveNeutral.setIcon(ThemedIcon("./assets/icons/arrow_left.svg"))
 
         self.btAddCounterpick = self.findChild(QPushButton, "btAddCounterpick")
         self.btAddCounterpick.clicked.connect(
             lambda x=None, view=self.stagesCounterpick: self.AddStage(view))
-        self.btAddCounterpick.setIcon(QIcon("./assets/icons/arrow_right.svg"))
+        self.btAddCounterpick.setIcon(ThemedIcon("./assets/icons/arrow_right.svg"))
 
         self.btRemoveCounterpick = self.findChild(
             QPushButton, "btRemoveCounterpick")
         self.btRemoveCounterpick.clicked.connect(
             lambda: self.RemoveStage(self.stagesCounterpick))
         self.btRemoveCounterpick.setIcon(
-            QIcon("./assets/icons/arrow_left.svg"))
+            ThemedIcon("./assets/icons/arrow_left.svg"))
 
         self.noDSR = self.findChild(QRadioButton, "noDSR")
         self.noDSR.clicked.connect(self.ExportCurrentRuleset)
@@ -142,11 +143,11 @@ class TSHScoreboardStageWidget(QDockWidget):
         self.ExportCurrentRuleset()
 
         self.btSave = self.findChild(QPushButton, "btSave")
-        self.btSave.setIcon(QIcon('assets/icons/save.svg'))
+        self.btSave.setIcon(ThemedIcon('assets/icons/save.svg'))
         self.btDelete = self.findChild(QPushButton, "btDelete")
-        self.btDelete.setIcon(QIcon('assets/icons/cancel.svg'))
+        self.btDelete.setIcon(ThemedIcon('assets/icons/cancel.svg'))
         self.btClear = self.findChild(QPushButton, "btClear")
-        self.btClear.setIcon(QIcon('assets/icons/undo.svg'))
+        self.btClear.setIcon(ThemedIcon('assets/icons/undo.svg'))
 
         self.rulesetName.textChanged.connect(self.UpdateBottomButtons)
         self.btSave.clicked.connect(self.SaveRuleset)
@@ -324,7 +325,7 @@ class TSHScoreboardStageWidget(QDockWidget):
 
                     item = QStandardItem(ruleset.get("name"))
                     item.setData(myRuleset, Qt.ItemDataRole.UserRole)
-                    item.setIcon(QIcon("./assets/icons/db.svg"))
+                    item.setIcon(ThemedIcon("./assets/icons/db.svg"))
                     rulesetsModel.appendRow(item)
         except FileNotFoundError:
             logger.warning("./user_data/rulesets.json not found, skipping import")
@@ -374,7 +375,7 @@ class TSHScoreboardStageWidget(QDockWidget):
 
                 item = QStandardItem(ruleset.get("name"))
                 item.setData(myRuleset, Qt.ItemDataRole.UserRole)
-                item.setIcon(QIcon("./assets/icons/startgg.svg"))
+                item.setIcon(ThemedIcon("./assets/icons/startgg.svg"))
                 rulesetsModel.appendRow(item)
 
         # Update list

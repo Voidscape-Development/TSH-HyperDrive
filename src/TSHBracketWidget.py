@@ -17,6 +17,7 @@ from .TSHHotkeys import TSHHotkeys
 from .SettingsManager import SettingsManager
 import traceback
 from loguru import logger
+from .TSHTheme import ThemedIcon
 
 # Checks if a number is power of 2
 
@@ -138,16 +139,14 @@ class TSHBracketWidget(QDockWidget):
 
         self.btRefreshPhase: QPushButton = self.findChild(
             QPushButton, "btRefreshPhase")
-        updateIcon = QImage("./assets/icons/undo.svg").scaled(24, 24)
-        self.btRefreshPhase.setIcon(QIcon(QPixmap.fromImage(updateIcon)))
+        self.btRefreshPhase.setIcon(ThemedIcon("./assets/icons/undo.svg"))
         self.btRefreshPhase.clicked.connect(lambda: [
             TSHTournamentDataProvider.instance.GetTournamentPhases()
         ])
 
         self.btRefreshPhaseGroup: QPushButton = self.findChild(
             QPushButton, "btRefreshPhaseGroup")
-        updateIcon = QImage("./assets/icons/undo.svg").scaled(24, 24)
-        self.btRefreshPhaseGroup.setIcon(QIcon(QPixmap.fromImage(updateIcon)))
+        self.btRefreshPhaseGroup.setIcon(ThemedIcon("./assets/icons/undo.svg"))
         self.btRefreshPhaseGroup.setToolTip(QApplication.translate(
             "app", "Reload the whole phase group, including its players"))
         self.btRefreshPhaseGroup.clicked.connect(self.PhaseGroupChanged)
@@ -247,7 +246,7 @@ class TSHBracketWidget(QDockWidget):
             QScrollArea, "scrollArea")
         self.btTogglePlayerList = QPushButton()
         self.btTogglePlayerList.setCheckable(True)
-        self.btTogglePlayerList.setIcon(QIcon("./assets/icons/people.svg"))
+        self.btTogglePlayerList.setIcon(ThemedIcon("./assets/icons/people.svg"))
         self.btTogglePlayerList.setSizePolicy(
             QSizePolicy.Maximum, QSizePolicy.Fixed)
         self.btTogglePlayerList.toggled.connect(self.SetPlayerListHidden)

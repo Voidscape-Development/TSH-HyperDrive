@@ -98,7 +98,7 @@ class TSHEventCard(QWidget):
         tile.setFixedSize(ICON_SIZE, ICON_SIZE)
         tile.setAlignment(Qt.AlignmentFlag.AlignCenter)
         tile.setStyleSheet(
-            f"background: {colors['tile'].name()}; border-radius: 8px;"
+            f"background: {colors['tile'].name()}; border-radius: {TSHTheme.Radius() + 2}px;"
             f"color: {muted.name()}; font-weight: bold;")
         logoPath = GameLogoPath(provider, event.get("gameId"))
         pixmap = QPixmap(logoPath) if logoPath else QPixmap()
@@ -231,7 +231,7 @@ class TSHSelectEventWindow(QDialog):
             QListWidget::item {{
                 background: {colors['card'].name()};
                 border: 1px solid {colors['border'].name()};
-                border-radius: 10px;
+                border-radius: {TSHTheme.Radius() + 4}px;
             }}
             QListWidget::item:hover {{
                 border: 1px solid {colors['hover'].name()};

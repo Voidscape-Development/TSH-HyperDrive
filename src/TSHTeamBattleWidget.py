@@ -13,6 +13,7 @@ from .TSHTeamPlayerWidget import TSHTeamPlayerWidget
 from .TSHColorButton import TSHColorButton
 from.Helpers.TSHLocaleHelper import TSHLocaleHelper
 from .Helpers.TSHVersionHelper import add_beta_label
+from .TSHTheme import ThemedIcon
 
 class TSHTeamBattleSignals(QObject):
     # GENERAL SIGNALS
@@ -173,7 +174,7 @@ class TSHTeamBattleWidget(QDockWidget):
         actionsLayout.setVerticalSpacing(3)
 
         self.eyeBt = QToolButton()
-        self.eyeBt.setIcon(QIcon('assets/icons/eye.svg'))
+        self.eyeBt.setIcon(ThemedIcon('assets/icons/eye.svg'))
         self.eyeBt.setFixedSize(26, 26)
         self.eyeBt.setIconSize(QSize(18, 18))
         self.eyeBt.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)

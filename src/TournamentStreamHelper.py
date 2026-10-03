@@ -39,7 +39,7 @@ if parse(qtpy.QT_VERSION).major == 6:
     QImageReader.setAllocationLimit(0)
 
 # The UI scale has to be set before the application is created
-from .TSHTheme import TSHTheme, ApplyUIScale
+from .TSHTheme import TSHTheme, ThemedIcon, ApplyUIScale
 ApplyUIScale()
 
 App = QApplication(sys.argv)
@@ -422,7 +422,7 @@ class Window(QMainWindow):
             self.dockWidgets.append(thumbnailSetting)
 
         bracket = TSHBracketWidget()
-        bracket.setWindowIcon(QIcon('assets/icons/info.svg'))
+        bracket.setWindowIcon(ThemedIcon('assets/icons/info.svg'))
         bracket.setObjectName(
             QApplication.translate("app", "Bracket"))
         self.addDockWidget(
@@ -430,7 +430,7 @@ class Window(QMainWindow):
         self.dockWidgets.append(bracket)
 
         tournamentInfo = TSHTournamentInfoWidget()
-        tournamentInfo.setWindowIcon(QIcon('assets/icons/info.svg'))
+        tournamentInfo.setWindowIcon(ThemedIcon('assets/icons/info.svg'))
         tournamentInfo.setObjectName(
             QApplication.translate("app", "Tournament Info"))
         self.addDockWidget(
@@ -438,7 +438,7 @@ class Window(QMainWindow):
         self.dockWidgets.append(tournamentInfo)
 
         teamBattle = TSHTeamBattleWidget()
-        teamBattle.setWindowIcon(QIcon('assets/icons/info.svg'))
+        teamBattle.setWindowIcon(ThemedIcon('assets/icons/info.svg'))
         teamBattle.setObjectName(
             add_beta_label(QApplication.translate("app", "Crew/Team Battle"), "team_battle"))
         self.addDockWidget(
@@ -446,7 +446,7 @@ class Window(QMainWindow):
         self.dockWidgets.append(teamBattle)
 
         self.scoreboard = TSHScoreboardManager.instance
-        self.scoreboard.setWindowIcon(QIcon('assets/icons/list.svg'))
+        self.scoreboard.setWindowIcon(ThemedIcon('assets/icons/list.svg'))
         self.scoreboard.setObjectName(
             QApplication.translate("app", "Scoreboard Manager"))
         self.addDockWidget(
@@ -463,7 +463,7 @@ class Window(QMainWindow):
         self.dockWidgets.append(self.stageWidget)
 
         commentary = TSHCommentaryWidget()
-        commentary.setWindowIcon(QIcon('assets/icons/mic.svg'))
+        commentary.setWindowIcon(ThemedIcon('assets/icons/mic.svg'))
         commentary.setObjectName(QApplication.translate("app", "Commentary"))
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, commentary)
         self.dockWidgets.append(commentary)
@@ -476,7 +476,7 @@ class Window(QMainWindow):
         self.stageWidget.stageStrikeLogic.signals.state_updated.connect(self.webserver.ws_ruleset)
 
         playerList = TSHPlayerListWidget()
-        playerList.setWindowIcon(QIcon('assets/icons/list.svg'))
+        playerList.setWindowIcon(ThemedIcon('assets/icons/list.svg'))
         playerList.setObjectName(QApplication.translate("app", "Player List"))
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, playerList)
         self.dockWidgets.append(playerList)
@@ -519,7 +519,7 @@ class Window(QMainWindow):
         self.unsetTournamentBt = QPushButton()
         self.unsetTournamentBt.setSizePolicy(
             QSizePolicy.Maximum, QSizePolicy.Maximum)
-        self.unsetTournamentBt.setIcon(QIcon("./assets/icons/cancel.svg"))
+        self.unsetTournamentBt.setIcon(ThemedIcon("./assets/icons/cancel.svg"))
         self.unsetTournamentBt.clicked.connect(lambda: [
             TSHTournamentDataProvider.instance.SetTournament(None)
         ])
@@ -532,9 +532,9 @@ class Window(QMainWindow):
 
             self.btLoadPlayerSet = QPushButton(
                 QApplication.translate("app", "Load tournament and sets from StartGG user"))
-            self.btLoadPlayerSet.setIcon(QIcon("./assets/icons/startgg.svg"))
+            self.btLoadPlayerSet.setIcon(ThemedIcon("./assets/icons/startgg.svg"))
             self.btLoadPlayerSet.clicked.connect(self.LoadUserSetClicked)
-            self.btLoadPlayerSet.setIcon(QIcon("./assets/icons/startgg.svg"))
+            self.btLoadPlayerSet.setIcon(ThemedIcon("./assets/icons/startgg.svg"))
             hbox.addWidget(self.btLoadPlayerSet)
 
             TSHTournamentDataProvider.instance.signals.user_updated.connect(
@@ -546,7 +546,7 @@ class Window(QMainWindow):
             self.btLoadPlayerSetOptions.setSizePolicy(
                 QSizePolicy.Maximum, QSizePolicy.Maximum)
             self.btLoadPlayerSetOptions.setIcon(
-                QIcon("./assets/icons/settings.svg"))
+                ThemedIcon("./assets/icons/settings.svg"))
             self.btLoadPlayerSetOptions.clicked.connect(
                 self.LoadUserSetOptionsClicked)
             hbox.addWidget(self.btLoadPlayerSetOptions)
@@ -558,7 +558,7 @@ class Window(QMainWindow):
         group_box.layout().addLayout(hbox)
         self.btPullCompletedSets = QPushButton(
             QApplication.translate("app", "Pull Latest Completed Sets from StartGG"))
-        self.btPullCompletedSets.setIcon(QIcon("./assets/icons/startgg.svg"))
+        self.btPullCompletedSets.setIcon(ThemedIcon("./assets/icons/startgg.svg"))
         self.btPullCompletedSets.clicked.connect(TSHTournamentDataProvider.instance.GetCompletedSets)
         hbox.addWidget(self.btPullCompletedSets)
         # label_margin = " "*18
@@ -574,7 +574,7 @@ class Window(QMainWindow):
         # self.btStopSetsPull = QPushButton()
         # self.btStopSetsPull.setSizePolicy(
         #     QSizePolicy.Maximum, QSizePolicy.Maximum)
-        # self.btStopSetsPull.setIcon(QIcon("./assets/icons/cancel.svg"))
+        # self.btStopSetsPull.setIcon(ThemedIcon("./assets/icons/cancel.svg"))
         # hbox.addWidget(self.btStopSetsPull)
 
         TSHTournamentDataProvider.instance.signals.tournament_changed.connect(
@@ -588,7 +588,7 @@ class Window(QMainWindow):
         # Settings
         menu_margin = " "*6
         self.optionsBt = QToolButton()
-        self.optionsBt.setIcon(QIcon('assets/icons/menu.svg'))
+        self.optionsBt.setIcon(ThemedIcon('assets/icons/menu.svg'))
         self.optionsBt.setToolButtonStyle(
             Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.optionsBt.setPopupMode(QToolButton.InstantPopup)
@@ -606,11 +606,11 @@ class Window(QMainWindow):
         action = self.optionsBt.menu().addAction(
             QApplication.translate("app", "Check for updates"))
         self.updateAction = action
-        action.setIcon(QIcon('assets/icons/undo.svg'))
+        action.setIcon(ThemedIcon('assets/icons/undo.svg'))
         action.triggered.connect(self.CheckForUpdates)
         action = self.optionsBt.menu().addAction(
             QApplication.translate("app", "Download assets"))
-        action.setIcon(QIcon('assets/icons/download.svg'))
+        action.setIcon(ThemedIcon('assets/icons/download.svg'))
         action.triggered.connect(lambda: TSHAssetDownloader.instance.DownloadAssets(self))
         self.downloadAssetsAction = action
 
@@ -634,7 +634,7 @@ class Window(QMainWindow):
 
         # action = self.optionsBt.menu().addAction(
         #     QApplication.translate("LayoutOptions", "Layout Options"))
-        # action.setIcon(QIcon('assets/icons/settings.svg'))
+        # action.setIcon(ThemedIcon('assets/icons/settings.svg'))
         # action.triggered.connect(lambda: self.layoutOptions.show())
 
         action = self.optionsBt.menu().addAction(
@@ -796,13 +796,13 @@ class Window(QMainWindow):
 
         action = self.optionsBt.menu().addAction(
             QApplication.translate("Settings", "Settings"))
-        action.setIcon(QIcon('assets/icons/settings.svg'))
+        action.setIcon(ThemedIcon('assets/icons/settings.svg'))
         action.triggered.connect(lambda: self.settingsWindow.show())
 
         self.aboutWidget = TSHAboutWidget()
         action = self.optionsBt.menu().addAction(
             QApplication.translate("About", "About"))
-        action.setIcon(QIcon('assets/icons/info.svg'))
+        action.setIcon(ThemedIcon('assets/icons/info.svg'))
         action.triggered.connect(lambda: self.aboutWidget.show())
 
         # Game Select and Scoreboard Count
@@ -999,7 +999,7 @@ class Window(QMainWindow):
             self.btLoadPlayerSet.setIcon(QIcon("./assets/icons/parrygg.png"))
         else:
             label = QApplication.translate("app", "Load tournament and sets from StartGG user")
-            self.btLoadPlayerSet.setIcon(QIcon("./assets/icons/startgg.svg"))
+            self.btLoadPlayerSet.setIcon(ThemedIcon("./assets/icons/startgg.svg"))
         if user_value:
             self.btLoadPlayerSet.setText(
                 label + " "
@@ -1021,7 +1021,7 @@ class Window(QMainWindow):
         if provider_name == "StartGG":
             self.btPullCompletedSets.setText(
                 QApplication.translate("app", "Pull Latest Completed Sets from StartGG"))
-            self.btPullCompletedSets.setIcon(QIcon("./assets/icons/startgg.svg"))
+            self.btPullCompletedSets.setIcon(ThemedIcon("./assets/icons/startgg.svg"))
         elif provider_name == "ParryGG":
             self.btPullCompletedSets.setText(
                 QApplication.translate("app", "Pull Latest Completed Sets from ParryGG"))
@@ -1029,7 +1029,7 @@ class Window(QMainWindow):
         else:
             self.btPullCompletedSets.setText(
                 QApplication.translate("app", "Pull Latest Completed Sets from StartGG"))
-            self.btPullCompletedSets.setIcon(QIcon("./assets/icons/startgg.svg"))
+            self.btPullCompletedSets.setIcon(ThemedIcon("./assets/icons/startgg.svg"))
 
     def LoadUserSetClicked(self):
         self.scoreboard.lastSetSelected = None
@@ -1231,14 +1231,8 @@ class Window(QMainWindow):
                     messagebox.exec()
             else:
                 if myVersion < currVersion:
-                    baseIcon = QPixmap(
-                        QImage("assets/icons/menu.svg").scaled(32, 32))
-                    updateIcon = QImage(
-                        "./assets/icons/update_circle.svg").scaled(12, 12)
-                    p = QPainter(baseIcon)
-                    p.drawImage(QPoint(20, 0), updateIcon)
-                    p.end()
-                    self.optionsBt.setIcon(QIcon(baseIcon))
+                    self.optionsBt.setIcon(ThemedIcon(
+                        "assets/icons/menu.svg", badge="./assets/icons/update_circle.svg"))
                     self.updateAction.setText(
                         QApplication.translate("app", "Check for updates") + " " + QApplication.translate("punctuation", "[") + QApplication.translate("app", "Update available!") + QApplication.translate("punctuation", "]"))
 
@@ -1247,16 +1241,10 @@ class Window(QMainWindow):
     def OnAssetUpdates(self, updates):
         try:
             if len(updates) > 0:
-                baseIcon = self.downloadAssetsAction.icon().pixmap(32, 32)
-                updateIcon = QImage(
-                    "./assets/icons/update_circle.svg").scaled(12, 12)
-                p = QPainter(baseIcon)
-                p.drawImage(QPoint(20, 0), updateIcon)
-                p.end()
-                self.downloadAssetsAction.setIcon(QIcon(baseIcon))
+                self.downloadAssetsAction.setIcon(ThemedIcon(
+                    "assets/icons/download.svg", badge="./assets/icons/update_circle.svg"))
             else:
-                baseIcon = self.downloadAssetsAction.icon().pixmap(32, 32)
-                self.downloadAssetsAction.setIcon(QIcon(baseIcon))
+                self.downloadAssetsAction.setIcon(ThemedIcon("assets/icons/download.svg"))
         except:
             logger.error(traceback.format_exc())
 

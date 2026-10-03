@@ -8,6 +8,7 @@ from .TSHPlayerDB import TSHPlayerDB
 from .SettingsManager import SettingsManager
 from .StateManager import StateManager
 from .TSHGameAssetManager import TSHGameAssetManager
+from .TSHTheme import ThemedIcon
 
 
 class TSHCommentaryWidget(QDockWidget):
@@ -56,7 +57,7 @@ class TSHCommentaryWidget(QDockWidget):
         self.characterNumber.valueChanged.connect(self.SetCharacterNumber)
         
         self.eyeBt = QToolButton()
-        self.eyeBt.setIcon(QIcon('assets/icons/eye.svg'))
+        self.eyeBt.setIcon(ThemedIcon('assets/icons/eye.svg'))
         self.eyeBt.setSizePolicy(
             QSizePolicy.Maximum, QSizePolicy.Fixed)
         col.layout().addWidget(self.eyeBt, Qt.AlignmentFlag.AlignRight)

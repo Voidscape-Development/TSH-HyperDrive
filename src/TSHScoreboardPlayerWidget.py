@@ -21,6 +21,7 @@ from .Helpers.TSHBadWordFilter import TSHBadWordFilter
 from .Helpers.TSHCustomPlayerCompleter import TSHCustomPlayerCompleter
 from .Helpers.TSHLocaleHelper import TSHLocaleHelper
 from loguru import logger
+from .TSHTheme import ThemedIcon
 
 
 class TSHScoreboardPlayerWidgetSignals(QObject):
@@ -87,7 +88,7 @@ class TSHScoreboardPlayerWidget(QGroupBox):
             QApplication.translate("app", "Save new player"))
         self.save_bt.setFont(QFont(self.save_bt.font().family(), 9))
         # self.save_bt.setFont(self.parent.font_small)
-        self.save_bt.setIcon(QIcon('assets/icons/save.svg'))
+        self.save_bt.setIcon(ThemedIcon('assets/icons/save.svg'))
         bottom_buttons_layout.addWidget(self.save_bt)
         self.save_bt.clicked.connect(self.SavePlayerToDB)
         self.findChild(QLineEdit, "name").editingFinished.connect(
@@ -99,7 +100,7 @@ class TSHScoreboardPlayerWidget(QGroupBox):
         self.delete_bt = QPushButton(
             QApplication.translate("app", "Delete player entry"))
         # self.delete_bt.setFont(self.parent.font_small)
-        self.delete_bt.setIcon(QIcon('assets/icons/cancel.svg'))
+        self.delete_bt.setIcon(ThemedIcon('assets/icons/cancel.svg'))
         bottom_buttons_layout.addWidget(self.delete_bt)
         self.delete_bt.setFont(QFont(self.delete_bt.font().family(), 9))
         self.delete_bt.setEnabled(False)
@@ -113,7 +114,7 @@ class TSHScoreboardPlayerWidget(QGroupBox):
         self.clear_bt = QPushButton(QApplication.translate("app", "Clear"))
         self.clear_bt.setFont(QFont(self.clear_bt.font().family(), 9))
         # self.clear_bt.setFont(self.parent.font_small)
-        self.clear_bt.setIcon(QIcon('assets/icons/undo.svg'))
+        self.clear_bt.setIcon(ThemedIcon('assets/icons/undo.svg'))
         bottom_buttons_layout.addWidget(self.clear_bt)
         self.clear_bt.clicked.connect(self.Clear)
         self.clear_bt.setMinimumWidth(1)
@@ -123,11 +124,11 @@ class TSHScoreboardPlayerWidget(QGroupBox):
         titleContainer.setSpacing(4)
         self.btMoveUp = QPushButton()
         self.btMoveUp.setFixedSize(24, 24)
-        self.btMoveUp.setIcon(QIcon("./assets/icons/arrow_up.svg"))
+        self.btMoveUp.setIcon(ThemedIcon("./assets/icons/arrow_up.svg"))
         titleContainer.addWidget(self.btMoveUp)
         self.btMoveDown = QPushButton()
         self.btMoveDown.setFixedSize(24, 24)
-        self.btMoveDown.setIcon(QIcon("./assets/icons/arrow_down.svg"))
+        self.btMoveDown.setIcon(ThemedIcon("./assets/icons/arrow_down.svg"))
         titleContainer.addWidget(self.btMoveDown)
 
         self.SetIndex(index, teamNumber)
@@ -480,13 +481,13 @@ class TSHScoreboardPlayerWidget(QGroupBox):
             # Move up/down
             btMoveUp = QPushButton()
             btMoveUp.setFixedSize(24, 24)
-            btMoveUp.setIcon(QIcon("./assets/icons/arrow_up.svg"))
+            btMoveUp.setIcon(ThemedIcon("./assets/icons/arrow_up.svg"))
             character_element.layout().addWidget(btMoveUp)
             btMoveUp.clicked.connect(lambda x=None, index=len(
                 self.character_elements): self.SwapCharacters(index, index-1))
             btMoveDown = QPushButton()
             btMoveDown.setFixedSize(24, 24)
-            btMoveDown.setIcon(QIcon("./assets/icons/arrow_down.svg"))
+            btMoveDown.setIcon(ThemedIcon("./assets/icons/arrow_down.svg"))
             character_element.layout().addWidget(btMoveDown)
             btMoveDown.clicked.connect(lambda x=None, index=len(
                 self.character_elements): self.SwapCharacters(index, index+1))
