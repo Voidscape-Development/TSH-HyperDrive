@@ -17,9 +17,14 @@ LOCATION_ICON_SIZE = 22
 DETAIL_ICON_SIZE = 14
 STRIPE_WIDTH = 4
 LOCATION_ICONS = {
-    "online": ["./assets/icons/online.svg"],
-    "offline": ["./assets/icons/offline.svg"],
-    "hybrid": ["./assets/icons/offline.svg", "./assets/icons/online.svg"],
+    "online": ["online"],
+    "offline": ["offline"],
+    "hybrid": ["offline", "online"],
+}
+# Glyph colors for each location badge, on dark and on light themes
+LOCATION_GLYPHS = {
+    "online": ("./assets/icons/online.svg", {"dark": "#60a5fa", "light": "#1d4ed8"}),
+    "offline": ("./assets/icons/offline.svg", {"dark": "#4ade80", "light": "#15803d"}),
 }
 
 
@@ -63,6 +68,27 @@ def TintedIcon(path, color, size):
     painter = QPainter(pixmap)
     painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
     painter.fillRect(pixmap.rect(), color)
+    painter.end()
+    return pixmap
+
+
+def LocationBadge(kind, colors, size):
+    # The glyph on a circle in the theme's colors, so the badge stands out
+    # from the card (and the selection highlight) in any theme
+    path, glyphColors = LOCATION_GLYPHS[kind]
+    glyph = QColor(glyphColors["dark" if TSHTheme.IsDark() else "light"])
+    scale = QApplication.primaryScreen().devicePixelRatio() if QApplication.primaryScreen() else 1.0
+    pixmap = QPixmap(round(size * scale), round(size * scale))
+    pixmap.setDevicePixelRatio(scale)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    painter.setPen(QPen(colors["border"], 1))
+    painter.setBrush(colors["tile"])
+    painter.drawEllipse(QRectF(0.5, 0.5, size - 1, size - 1))
+    inner = round(size * 0.7)
+    offset = (size - inner) / 2
+    painter.drawPixmap(QRectF(offset, offset, inner, inner).toRect(), TintedIcon(path, glyph, inner))
     painter.end()
     return pixmap
 
@@ -142,9 +168,9 @@ class TSHEventCard(QWidget):
         # Online/offline as icons, so it reads at a glance
         location = event.get("location")
         tooltip = LocationNames().get(location)
-        for icon in LOCATION_ICONS.get(location, []):
+        for kind in LOCATION_ICONS.get(location, []):
             label = QLabel()
-            label.setPixmap(QIcon(icon).pixmap(LOCATION_ICON_SIZE, LOCATION_ICON_SIZE))
+            label.setPixmap(LocationBadge(kind, colors, LOCATION_ICON_SIZE))
             label.setToolTip(tooltip)
             nameRow.addWidget(label)
 
