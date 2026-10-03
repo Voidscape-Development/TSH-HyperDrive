@@ -691,6 +691,16 @@ class WebServer(QThread):
         info = orjson.loads(message) if isinstance(message, (str, bytes)) else message
         WebServer.ws_emit('set_tournament', WebServer.actions.load_tournament(info.get('url')))
 
+    # List a tournament's events, to pick one for set-tournament
+    @app.route('/tournament-events')
+    def tournament_events():
+        return WebServer.actions.get_tournament_events(request.args.get('url'))
+
+    @socketio.on('get_tournament_events')
+    def ws_get_tournament_events(message):
+        info = orjson.loads(message) if isinstance(message, (str, bytes)) else message
+        WebServer.ws_emit('get_tournament_events', WebServer.actions.get_tournament_events(info.get('url')))
+
     @app.route('/states')
     def get_states():
         countryCode = request.args.get('countryCode', None)

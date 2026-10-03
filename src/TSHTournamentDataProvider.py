@@ -1,4 +1,3 @@
-import re
 import time
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
@@ -9,6 +8,8 @@ from .TSHGameAssetManager import TSHGameAssetManager
 from .TournamentDataProvider.TournamentDataProvider import TournamentDataProvider
 from .TournamentDataProvider.StartGGDataProvider import StartGGDataProvider
 from .TournamentDataProvider.ParryGGDataProvider import ParryGGDataProvider
+from .TournamentDataProvider.TournamentEventLookup import ParseTournamentInput
+from .TSHSelectEventWindow import TSHSelectEventWindow
 from .Helpers.TSHVersionHelper import get_supported_providers
 from loguru import logger
 
@@ -165,26 +166,15 @@ class TSHTournamentDataProvider(QObject):
         inp.setLayout(layout)
 
         inp.layout().addWidget(QLabel(
-            QApplication.translate("app", "Paste the tournament URL.")+ "\n" + QApplication.translate("app", "For StartGG, the link must contain the /event/ part") + "\n" + QApplication.translate("app", "Supported providers:") + " " + ", ".join(get_supported_providers())
+            QApplication.translate("app", "Paste the tournament URL.")+ "\n" + QApplication.translate("app", "An event link loads that event. A tournament link, start.gg short link or tournament slug lets you pick one of its events.") + "\n" + QApplication.translate("app", "Supported providers:") + " " + ", ".join(get_supported_providers())
 
         ))
 
         lineEdit = QLineEdit()
         okButton = QPushButton(QApplication.translate("app", "OK"))
-        validators = [
-            QRegularExpression("start.gg/tournament/[^/]+/event[s]?/[^/]+"),
-            QRegularExpression("start.gg/admin/tournament/[^/]+/brackets/[^/]+"),
-            
-            QRegularExpression("parry.gg/[^/]+/[^/]+")
-        ]
 
         def validateText():
-            okButton.setDisabled(True)
-
-            for validator in validators:
-                match = validator.match(lineEdit.text()).capturedTexts()
-                if len(match) > 0:
-                    okButton.setDisabled(False)
+            okButton.setDisabled(ParseTournamentInput(lineEdit.text()) is None)
 
         lineEdit.textEdited.connect(validateText)
 
@@ -198,30 +188,18 @@ class TSHTournamentDataProvider(QObject):
         inp.resize(600, 10)
 
         if inp.exec_() == QDialog.Accepted:
-            url = lineEdit.text()
+            parsed = ParseTournamentInput(lineEdit.text())
 
-            if "start.gg" in url:
-                matches = re.match(
-                    "(.*start.gg/tournament/[^/]*/event[s]?/[^/]*)", url)
-                if matches:
-                    url = matches.group(0)
+            def loadEvent(url):
+                SettingsManager.Set("TOURNAMENT_URL", url)
+                TSHTournamentDataProvider.instance.SetTournament(
+                    SettingsManager.Get("TOURNAMENT_URL"))
 
-                    # Some URLs in startgg have eventS but the API doesn't work with that format
-                    url = url.replace("/events/", "/event/")
-
-            elif "parry.gg" in url:
-                # Remove the "_manage" part of admin urls first
-                url = url.replace("/_manage", "")
-
-                matches = re.match(
-                    "(.*parry.gg/[^/]*/[^/]*)", url)
-
-                if matches:
-                    url = matches.group()
-
-            SettingsManager.Set("TOURNAMENT_URL", url)
-            TSHTournamentDataProvider.instance.SetTournament(
-                SettingsManager.Get("TOURNAMENT_URL"))
+            if parsed["kind"] == "event":
+                loadEvent(parsed["url"])
+            else:
+                TSHSelectEventWindow(mainWindow, self.threadPool, loadEvent).Load(
+                    parsed, SettingsManager.Get("api_keys.parrygg"))
 
         inp.deleteLater()
 
