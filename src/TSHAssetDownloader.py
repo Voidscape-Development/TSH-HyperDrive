@@ -13,6 +13,7 @@ import py7zr
 import orjson
 import os
 from loguru import logger
+from .TSHTheme import ThemedIcon
 
 
 class IconDelegate(QStyledItemDelegate):
@@ -34,8 +35,8 @@ class TSHAssetDownloader(QObject):
         self.signals = TSHAssetDownloaderSignals()
 
     def UiMounted(self):
-        self.iconUpdateAvailable = QIcon('assets/icons/update_available.svg')
-        self.iconInstalled = QIcon('assets/icons/installed.svg')
+        self.iconUpdateAvailable = ThemedIcon('assets/icons/update_available.svg')
+        self.iconInstalled = ThemedIcon('assets/icons/installed.svg')
 
     def CheckAssetUpdates(self, game_codename=None):
         class AssetUpdatesThread(QThread):

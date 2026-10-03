@@ -1,5 +1,4 @@
 import os
-import re
 from flask import abort
 from qtpy.QtGui import *
 from qtpy.QtWidgets import *
@@ -18,6 +17,8 @@ from .TSHBracketWidget import TSHBracketWidget
 from .TSHPlayerDB import TSHPlayerDB
 from .TSHScoreboardWidget import TSHScoreboardWidget
 from .TSHTournamentDataProvider import TSHTournamentDataProvider
+from .TournamentDataProvider.TournamentEventLookup import (
+    ParseTournamentInput, NormalizeEventURL, FetchTournamentEvents, TournamentLookupError)
 from .TSHCommentaryWidget import TSHCommentaryWidget
 from .Helpers.TSHControllerHelper import TSHControllerHelper
 from .Helpers.TSHLocaleHelper import TSHLocaleHelper
@@ -602,41 +603,28 @@ class WebServerActions(QThread):
             TSHTournamentDataProvider.instance.signals.tournament_url_update.emit(None)
             return "OK"
         else:
-            validators = [
-                QRegularExpression("start.gg/tournament/[^/]+/event[s]?/[^/]+"),
-                
-                QRegularExpression("parry.gg/[^/]+/[^/]+")
-            ]
+            parsed = ParseTournamentInput(url)
+            if parsed and parsed["kind"] == "tournament":
+                return "ERROR: This is a tournament, not an event. Get its events from /tournament-events and load one of their URLs"
 
-            for validator in validators:
-                    match = validator.match(url).capturedTexts()
-                    if len(match) > 0:
-                        continue
-            
-            if "start.gg" in url:
-                matches = re.match(
-                    "(.*start.gg/tournament/[^/]*/event[s]?/[^/]*)", url)
-                if matches:
-                    url = matches.group(0)
-
-                    # Some URLs in startgg have eventS but the API doesn't work with that format
-                    url = url.replace("/events/", "/event/")
-
-            elif "parry.gg" in url:
-                # Remove the "_manage" part of admin urls first
-                url = url.replace("/_manage", "")
-
-                matches = re.match(
-                    "(.*parry.gg/[^/]*/[^/]*)", url)
-
-                if matches:
-                    url = matches.group()
-
+            url = NormalizeEventURL(url)
 
             SettingsManager.Set("TOURNAMENT_URL", url)
             TSHTournamentDataProvider.instance.signals.tournament_url_update.emit(url)
             
             return "OK"
+
+    def get_tournament_events(self, url=None):
+        # Lists a tournament's events, so a client can pick one for load_tournament
+        parsed = ParseTournamentInput(url)
+        if parsed is None:
+            return {"error": "invalid_url", "message": "Not a tournament or event URL"}
+        if parsed["kind"] == "event":
+            return {"error": "is_event", "message": "This is already an event URL; load it with /set-tournament", "url": parsed["url"]}
+        try:
+            return FetchTournamentEvents(parsed, SettingsManager.Get("api_keys.parrygg"))
+        except TournamentLookupError as e:
+            return {"error": e.code, "message": str(e)}
 
     @gui_thread_sync
     def get_states(self, countryCode: str):

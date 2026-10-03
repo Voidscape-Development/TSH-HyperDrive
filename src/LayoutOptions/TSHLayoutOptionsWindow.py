@@ -2,6 +2,7 @@ from qtpy.QtGui import *
 from qtpy.QtCore import *
 from qtpy.QtWidgets import *
 from .LayoutOptionsWidget import LayoutOptionsWidget
+from ..TSHTheme import ThemedIcon
 
 
 class TSHLayoutOptionsWindow(QDialog):
@@ -50,12 +51,12 @@ class TSHLayoutOptionsWindow(QDialog):
         # Create the push buttons to save/update and delete presets
         save_options = QHBoxLayout()
         self.saveBtn = QPushButton()
-        self.saveBtn.setIcon(QIcon('assets/icons/save.svg'))
+        self.saveBtn.setIcon(ThemedIcon('assets/icons/save.svg'))
         # self.saveBtn.setText(QApplication.translate("app", "Save new"))
         self.saveBtn.setText(QApplication.translate("app", "Update"))
         save_options.addWidget(self.saveBtn)
         self.deleteBtn = QPushButton()
-        self.deleteBtn.setIcon(QIcon('assets/icons/cancel.svg'))
+        self.deleteBtn.setIcon(ThemedIcon('assets/icons/cancel.svg'))
         self.deleteBtn.setText("Delete")
         save_options.addWidget(self.deleteBtn)
 

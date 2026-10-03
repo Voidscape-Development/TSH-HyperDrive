@@ -3,6 +3,7 @@ from qtpy.QtWidgets import *
 from .SettingsWidget import SettingsWidget
 from ..TSHHotkeys import TSHHotkeys
 from ..Helpers.TSHVersionHelper import add_beta_label, get_beta_status
+from .TSHAppearanceSettings import TSHAppearanceSettings
 
 
 class TSHSettingsWindow(QDialog):
@@ -169,6 +170,9 @@ class TSHSettingsWindow(QDialog):
 
         self.add_setting_widget(QApplication.translate(
             "settings", "General"), SettingsWidget("general", generalSettings))
+
+        self.add_setting_widget(QApplication.translate(
+            "settings", "Appearance"), TSHAppearanceSettings())
 
         # Add hotkey settings
         hotkeySettings = []

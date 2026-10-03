@@ -28,6 +28,7 @@ from .TSHPlayerDB import TSHPlayerDB
 
 from .thumbnail import main_generate_thumbnail as thumbnail
 from .TSHThumbnailSettingsWidget import *
+from .TSHTheme import ThemedIcon
 
 
 empty = {}
@@ -192,7 +193,7 @@ class TSHScoreboardWidget(QWidget):
         if not SettingsManager.Get("general.disable_thumbnail_widget", False):
             self.thumbnailBtn = QPushButton(
                 QApplication.translate("app", "Generate Thumbnail") + " ")
-            self.thumbnailBtn.setIcon(QIcon('assets/icons/png_file.svg'))
+            self.thumbnailBtn.setIcon(ThemedIcon('assets/icons/png_file.svg'))
             self.thumbnailBtn.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
             col.layout().addWidget(self.thumbnailBtn, Qt.AlignmentFlag.AlignRight)
             # self.thumbnailBtn.setPopupMode(QToolButton.InstantPopup)
@@ -201,7 +202,7 @@ class TSHScoreboardWidget(QWidget):
         if SettingsManager.Get("bsky_account.enable_bluesky", True):
             self.bskyBtn = QPushButton(
                 QApplication.translate("app", "Post to Bluesky") + " ")
-            self.bskyBtn.setIcon(QIcon('assets/icons/bsky.svg'))
+            self.bskyBtn.setIcon(ThemedIcon('assets/icons/bsky.svg'))
             self.bskyBtn.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
             col.layout().addWidget(self.bskyBtn, Qt.AlignmentFlag.AlignRight)
             self.bskyBtn.clicked.connect(self.PostToBsky)
@@ -214,7 +215,7 @@ class TSHScoreboardWidget(QWidget):
         topOptions.layout().addWidget(col)
 
         self.eyeBt = QToolButton()
-        self.eyeBt.setIcon(QIcon('assets/icons/eye.svg'))
+        self.eyeBt.setIcon(ThemedIcon('assets/icons/eye.svg'))
         self.eyeBt.setSizePolicy(
             QSizePolicy.Maximum, QSizePolicy.Fixed)
         col.layout().addWidget(self.eyeBt, Qt.AlignmentFlag.AlignRight)
@@ -274,7 +275,7 @@ class TSHScoreboardWidget(QWidget):
 
         self.btSelectSet = QPushButton(
             QApplication.translate("app", "Load set"))
-        self.btSelectSet.setIcon(QIcon("./assets/icons/list.svg"))
+        self.btSelectSet.setIcon(ThemedIcon("./assets/icons/list.svg"))
         self.btSelectSet.setEnabled(False)
         bottomOptions.layout().addWidget(self.btSelectSet)
         self.btSelectSet.clicked.connect(self.signals.SetSelection.emit)
@@ -284,7 +285,7 @@ class TSHScoreboardWidget(QWidget):
 
         self.btLoadStationSet = QPushButton(
             QApplication.translate("app", "Track sets from a stream or station"))
-        self.btLoadStationSet.setIcon(QIcon("./assets/icons/station.svg"))
+        self.btLoadStationSet.setIcon(ThemedIcon("./assets/icons/station.svg"))
         hbox.addWidget(self.btLoadStationSet)
         self.btLoadStationSet.clicked.connect(
             self.signals.StationSelection.emit)
@@ -295,7 +296,7 @@ class TSHScoreboardWidget(QWidget):
         if self.scoreboardNumber <= 1 and not SettingsManager.Get("general.hide_track_player", False) :
             self.btLoadPlayerSet = QPushButton("Load player set")
             self.btLoadPlayerSet.setIcon(
-                QIcon("./assets/icons/person_search.svg"))
+                ThemedIcon("./assets/icons/person_search.svg"))
             self.btLoadPlayerSet.setEnabled(False)
             self.btLoadPlayerSet.clicked.connect(
                 self.signals.UserSetSelection.emit)
@@ -309,7 +310,7 @@ class TSHScoreboardWidget(QWidget):
             self.btLoadPlayerSetOptions.setSizePolicy(
                 QSizePolicy.Maximum, QSizePolicy.Maximum)
             self.btLoadPlayerSetOptions.setIcon(
-                QIcon("./assets/icons/settings.svg"))
+                ThemedIcon("./assets/icons/settings.svg"))
             self.btLoadPlayerSetOptions.clicked.connect(
                 self.LoadUserSetOptionsClicked)
             hbox.addWidget(self.btLoadPlayerSetOptions)
@@ -342,7 +343,7 @@ class TSHScoreboardWidget(QWidget):
         self.timerTime = QLabel("0")
         self.timerLayout.layout().addWidget(self.timerTime)
         self.timerCancelBt = QPushButton()
-        self.timerCancelBt.setIcon(QIcon('assets/icons/cancel.svg'))
+        self.timerCancelBt.setIcon(ThemedIcon('assets/icons/cancel.svg'))
         self.timerCancelBt.setIconSize(QSize(12, 12))
         self.timerCancelBt.clicked.connect(
             lambda: self.StopAutoUpdate(clear_variables=True))
@@ -536,7 +537,7 @@ class TSHScoreboardWidget(QWidget):
         self.scoreColumn.findChild(
             QPushButton, "btSwapTeams").clicked.connect(self.SwapTeams)
         self.scoreColumn.findChild(
-            QPushButton, "btSwapTeams").setIcon(QIcon('assets/icons/swap.svg'))
+            QPushButton, "btSwapTeams").setIcon(ThemedIcon('assets/icons/swap.svg'))
 
         self.scoreColumn.findChild(
             QPushButton, "btResetScore").clicked.connect(
@@ -546,7 +547,7 @@ class TSHScoreboardWidget(QWidget):
                 ]
         )
         self.scoreColumn.findChild(
-            QPushButton, "btResetScore").setIcon(QIcon('assets/icons/undo.svg'))
+            QPushButton, "btResetScore").setIcon(ThemedIcon('assets/icons/undo.svg'))
 
         # Add default and user tournament phase title files
         self.scoreColumn.findChild(QComboBox, "phase").addItem("")

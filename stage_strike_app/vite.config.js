@@ -30,6 +30,7 @@ export default defineConfig(({ mode }) => {
     '/load-',
     '/update-',
     '/set-tournament',
+    '/tournament-events',
     '/states',
     '/pull-user',
     '/reset-',

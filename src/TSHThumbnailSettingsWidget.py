@@ -17,6 +17,7 @@ from .TSHGameAssetManager import *
 from .Workers import Worker
 from .Helpers.TSHDictHelper import deep_get, deep_set
 from .Helpers.TSHDirHelper import TSHResolve
+from .TSHTheme import ThemedIcon
 
 
 class PreviewWidget(QWidget):
@@ -109,7 +110,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
             QPushButton, "customForeground")
         self.foregroundReset = self.settings.findChild(
             QPushButton, "customForegroundReset")
-        self.foregroundReset.setIcon(QIcon('assets/icons/undo.svg'))
+        self.foregroundReset.setIcon(ThemedIcon('assets/icons/undo.svg'))
         self.foregroundReset.clicked.connect(lambda: [
             SettingsManager.Unset("thumbnail_config.foreground_path"),
             self.GeneratePreview()
@@ -119,7 +120,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
             QPushButton, "customBackground")
         self.backgroundReset = self.settings.findChild(
             QPushButton, "customBackgroundReset")
-        self.backgroundReset.setIcon(QIcon('assets/icons/undo.svg'))
+        self.backgroundReset.setIcon(ThemedIcon('assets/icons/undo.svg'))
         self.backgroundReset.clicked.connect(lambda: [
             SettingsManager.Unset("thumbnail_config.background_path"),
             self.GeneratePreview()
@@ -128,7 +129,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
         self.mainIcon = self.settings.findChild(QPushButton, "customMainIcon")
         self.mainIconReset = self.settings.findChild(
             QPushButton, "customMainIconReset")
-        self.mainIconReset.setIcon(QIcon('assets/icons/undo.svg'))
+        self.mainIconReset.setIcon(ThemedIcon('assets/icons/undo.svg'))
         self.mainIconReset.clicked.connect(lambda: [
             SettingsManager.Unset("thumbnail_config.main_icon_path"),
             self.GeneratePreview()
@@ -138,7 +139,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
             QPushButton, "customTopLeftIcon")
         self.topLeftIconReset = self.settings.findChild(
             QPushButton, "customTopLeftIconReset")
-        self.topLeftIconReset.setIcon(QIcon('assets/icons/undo.svg'))
+        self.topLeftIconReset.setIcon(ThemedIcon('assets/icons/undo.svg'))
         self.topLeftIconReset.clicked.connect(lambda: [
             SettingsManager.Unset("thumbnail_config.side_icon_list.L"),
             self.GeneratePreview()
@@ -148,7 +149,7 @@ class TSHThumbnailSettingsWidget(QDockWidget):
             QPushButton, "customTopRightIcon")
         self.topRightIconReset = self.settings.findChild(
             QPushButton, "customTopRightIconReset")
-        self.topRightIconReset.setIcon(QIcon('assets/icons/undo.svg'))
+        self.topRightIconReset.setIcon(ThemedIcon('assets/icons/undo.svg'))
         self.topRightIconReset.clicked.connect(lambda: [
             SettingsManager.Unset("thumbnail_config.side_icon_list.R"),
             self.GeneratePreview()
