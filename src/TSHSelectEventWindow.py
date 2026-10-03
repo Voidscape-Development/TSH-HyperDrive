@@ -12,6 +12,20 @@ from .TournamentDataProvider.TournamentEventLookup import (
 from .Workers import Worker
 
 ICON_SIZE = 48
+LOCATION_ICON_SIZE = 22
+LOCATION_ICONS = {
+    "online": ["./assets/icons/online.svg"],
+    "offline": ["./assets/icons/offline.svg"],
+    "hybrid": ["./assets/icons/offline.svg", "./assets/icons/online.svg"],
+}
+
+
+def LocationNames():
+    return {
+        "online": QApplication.translate("app", "Online"),
+        "offline": QApplication.translate("app", "Offline"),
+        "hybrid": QApplication.translate("app", "Hybrid (online and offline)"),
+    }
 
 
 def GameLogoPath(provider, gameId):
@@ -49,12 +63,24 @@ class TSHEventCard(QWidget):
         text.setSpacing(2)
         layout.addLayout(text, 1)
 
+        nameRow = QHBoxLayout()
+        text.addLayout(nameRow)
+
         name = QLabel(event.get("name", ""))
         font = name.font()
         font.setBold(True)
         font.setPointSizeF(font.pointSizeF() * 1.15)
         name.setFont(font)
-        text.addWidget(name)
+        nameRow.addWidget(name, 1)
+
+        # Online/offline as icons, so it reads at a glance
+        location = event.get("location")
+        tooltip = LocationNames().get(location)
+        for icon in LOCATION_ICONS.get(location, []):
+            label = QLabel()
+            label.setPixmap(QIcon(icon).pixmap(LOCATION_ICON_SIZE, LOCATION_ICON_SIZE))
+            label.setToolTip(tooltip)
+            nameRow.addWidget(label)
 
         details = QLabel(" · ".join(self.Details(event)))
         details.setWordWrap(True)
@@ -76,13 +102,6 @@ class TSHEventCard(QWidget):
             details.append(QApplication.translate("app", "Completed"))
         else:
             details.append(QApplication.translate("app", "Upcoming"))
-        location = {
-            "online": QApplication.translate("app", "Online"),
-            "offline": QApplication.translate("app", "Offline"),
-            "hybrid": QApplication.translate("app", "Hybrid"),
-        }.get(event.get("location"))
-        if location:
-            details.append(location)
         return details
 
 
